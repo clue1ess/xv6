@@ -185,6 +185,8 @@ UPROGS=\
 	_protection_level_test\
 	_protection2\
 	_protection3\
+	_protection2_\
+	_protection3_\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -255,6 +257,7 @@ EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
 	test.c protection_level_test.c protection2.c protection3.c\
+	protection2_.c protection3_.c\
 	printf.c umalloc.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\	

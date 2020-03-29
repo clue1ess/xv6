@@ -16,8 +16,8 @@ main(void)
    printf(1, "val after change before mprotect : %d\n", var);
    addr = (char *)PGROUNDDOWN(&var);
    mprotect((void *)addr, 1);
+   munprotect((void *)addr, 1);
    var = 9;
    printf(1, "val after mprotect : %d\n", var);
-   munprotect((void *)addr, 1);
    exit();
 }

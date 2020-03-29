@@ -1,10 +1,9 @@
+//test file taken from : https://github.com/aditvenk/xv6_virtual_memory/blob/master/user/tester.c
+
 #include "types.h"
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
-
-#undef NULL
-#define NULL ((void*)0)
 
 #define PGSIZE (4096)
 #define PGROUNDUP(sz) ((((uint)sz)+PGSIZE-1) & ~(PGSIZE-1))
@@ -24,8 +23,6 @@ int
 main(int argc, char *argv[])
 {
    ppid = getpid();
- 
-   //fork remaining
 
    char *brk = sbrk(0);
    sbrk(PGROUNDUP(brk) - (uint)brk);

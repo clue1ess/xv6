@@ -19,7 +19,6 @@ main(void)
    mprotect((void *)addr, 1);
    pid = fork();
    if(pid == 0) {
-        //munprotect((void *)addr, 1);
 	var = 11;
    	printf(1, "val after munprotect in child: %d\n", var);
 	exit();
