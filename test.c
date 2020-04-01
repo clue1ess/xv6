@@ -1,9 +1,11 @@
 #include "types.h"
 #include "user.h"
+#include "stat.h"
 
-int main()
-{
-int* a=0;
-printf(1,"Accessing uninitialized pointer %d\n", *a);
-exit();
+#define NULL ((void *)0)
+
+int main(int argc, char *argv[]) {
+	int *a = NULL;
+	printf(1,"null ptr dereference %d\n", *a);
+	exit();
 }
