@@ -1,10 +1,4 @@
-BOOTING PROCESS
 
-1. When computer is turned on, PC will point to a location set by manufacturer(typically in ROM) which is BIOS.
-2. BIOS initializes hardware devices and has settings which defines boot order. BIOS will scan for existing devices.
-3. On first hit, it will load contents of sector 0 of that device into predefined location in RAM, known as bootloader.
-4. Bootloader will select OS to load(e.g., grub).
-5. It loads selected OS into memory from secondary storage and jump to it.
 
 PROCESS
 A program in execution is called process. Every process has its own memory, registors, stack, data, etc., i.e. every process has its own address space. For multi-programming environment, two constraints are there:
@@ -14,12 +8,6 @@ A program in execution is called process. Every process has its own memory, regi
 
 META NOTE: suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
 
-ZOMBIE PROCESS
-
-1. A process which still has entry in process table.
-2. Child killed itself but parent did not do wait, so resources allocated to child are not released.
-OR
-3. Parent is dead before child.
 
 SEGMENTATION
 
