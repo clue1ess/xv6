@@ -1,10 +1,7 @@
 
 
 PROCESS
-A program in execution is called process. Every process has its own memory, registors, stack, data, etc., i.e. every process has its own address space. For multi-programming environment, two constraints are there:
-1. No process should access another's process address space or kernel's address space.
-2. While context switching (i.e. time sharing between process so that each process feels it is getting it's own cpu and memory.)
-    context of current process is to be saved and context of other process is to be loaded. ? need to write more
+A program in execution is called process.  ? need to write more
 
 META NOTE: suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
 
@@ -13,15 +10,7 @@ SEGMENTATION
 
 PAGING
 
-2-LEVEL PAGING :
 
-10      10      12                  
-pde     pte     page
-
-pgdir (2^12 entries and top 10 bits of address
-will give particular entry in pgdir and that entry    --> pagetable(2^12 entries and next 10 bits will
-will contain base address of oage table)                            give particular entry in page table and that  --> page(last 12 bits will
-                                                                    entry will point to base address of page)           offset in that page)
                                                                     
 
 ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -60,16 +49,9 @@ start:
 
             How is descriptor stored exactly?
                 bootloader puts data and code at 1MB initially, so code and data descriptors should be placed from 0 to 1MB-1 PA space
-                size of descriptor is 8 bytes.
-                Therfore, limit can be max 1MB - 1 i.e 20 bits.
-                base is of 32 bits.
+                Therfore, 
 
-                first word -> upper 16 bits of limit 
-                second word -> lower 16 bits of base
-                fifth byte -> next 8 bits of base
-                sixth byte -> ARB (Access right bytes i.e. type or permissions) 
-                seventh byte -> next 4 bits of limit and some bits(G, Available.., not important for now)
-                eighth byte -> upper 8 bits of base
+                
 
              Q.limit uses upper 20 bits, why?
              Q. why code and data has same mapping 0 to limit?

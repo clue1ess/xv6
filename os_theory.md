@@ -2,7 +2,7 @@
 
 **Meta note** : This explanation assume that you have enough understanding of computer organization and assembly language.
 
-**Reference** : My class notes of professor Abhijit A.M.(Operating system) and professor A.A Sawant(Microprocessor Techniques, Computer organization, Advanced Microprocessor Techniques) and some web links(mentioned in respective sections.)
+**Reference** : My class notes of professor Abhijit A.M.(Operating system) and professor A.A Sawant(Microprocessor Techniques, Computer organization, Advanced Microprocessor Techniques) and video leactures by Sourav Bansal(IITD) and some web links(mentioned in respective sections.)
 
 ## What is OS?
 
@@ -37,12 +37,17 @@ Processor has PC(Program Counter) registor which stores the address of next inst
 3. Execute th einstruction.
 4. Increment the PC.
 
+Processor is made to work in two modes:
+
+1. Real addressing mode (single task)
+2. Virtual addressing mode (multi task)
+
 
 ## Booting process
 
 1. When computer is turned on, PC will point to a location set by manufacturer(typically in ROM) which is BIOS.
 2. BIOS initializes hardware devices and has settings which defines boot order. BIOS will scan for existing devices.
-3. On first hit, it will load contents of sector 0 of that device into predefined location in RAM, known as bootloader.
+3. On first hit, it will load contents of sector 0(512 bytes) of that device into predefined location in RAM, known as bootloader.
 4. Bootloader will select OS to load(e.g., grub).
 5. It loads selected OS into memory from secondary storage and jump to it.
 
@@ -73,6 +78,12 @@ For single task OS environment, ony one program is loaded into memory. But for m
 Each program has four segments - *code, data. stack, heap*. No program should spoil other program's segments and also that of OS. Hence, CPU has two modes of operation specified by mode bit:
 1. User mode (normal instructions can run in this mode).
 2. Kernel mode (priviledge instructions can also run in this mode.)
+
+Acutually, there are four priviledge level represented by two bits as :
+00 - kernel mode
+01 - os services
+10 - device drivers
+11 - application programs(user mode)
 
 What exactly are priviledge instructructions?
 -> accesing I/O, changing mode of operations, execution of ISR(Interrupt Service Routine), schedulling processes, etc.
@@ -155,5 +166,82 @@ Reference : http://www.csl.mtu.edu/cs4411.ck/www/NOTES/process/fork/wait.html
 A shell in a Linux operating system takes input from you in the form of commands, processes it, and then gives an output. It is the interface through which a user works on the programs, commands, and scripts.
 Refer this https://oskarth.com/unix01/
 
-## Memory Management
+# Scheduler
 
+Functions:
+1. Save the context of the currently running process.
+2. Select the next process from the list of runnable process.
+3. Load the process's registors and PC.
+4. Give control to that process.
+
+## Physical address space
+
+   Memory mapped devices
+   unused
+   Extended memory(RAM)
+   VGA memory
+   BIOS/device
+   Low memory
+
+## Process address space
+
+Every process has its own memory, registors, stack, data, etc., i.e. every process has its own address space. For multi-programming environment, two constraints are there:
+1. No process should access another's process address space or kernel's address space.
+2. While context switching (i.e. time sharing between process so that each process feels it is getting it's own cpu and memory.)
+    context of current process is to be saved and context of other process is to be loaded.
+
+The virtual address space for a process is the set of virtual memory addresses that it can use. The address space for each process is private and cannot be accessed by other processes unless it is shared. A virtual address does not represent the actual physical location of an object in memory.
+
+Reference : https://docs.microsoft.com/en-us/windows/win32/memory/virtual-address-space
+
+### Segmentation :
+   va(virtual address) --> MMU(memory management unit) --> pa(physical address)
+
+   Each process has four segments. 
+   In real addressing mode:
+   The info about starting address of each segment, how much space it needed, what is it priviledge level are stored in descriptor of that segment. Such descriptors are stored in GDT(global descriptor table). GDTR registor is used to find base of GDT. lgdt is instruction used to load base address of GDT into GDTR. 
+
+   Decriptor entry :
+
+   size of descriptor is 8 bytes.
+   limit can be max 1MB - 1 i.e 20 bits.
+   base is of 32 bits.
+
+   first word -> upper 16 bits of limit 
+   second word -> lower 16 bits of base
+   fifth byte -> next 8 bits of base
+   sixth byte -> ARB (Access right bytes i.e. type or permissions) 
+   seventh byte -> next 4 bits of limit and some bits(G, Available.., not important for now)
+   eighth byte -> upper 8 bits of base
+
+   CS(code segment), DS(data), ES(extra), SS(stack) are known as selector because this segmnets selects appropriate descriptor in gdt and that descriptor give base(starting address) and limit(max size) of that segment. 
+
+   Let's go through an example:
+
+   Suppose we made call instruction(wants to change CS) 
+   call cs, ip i.e call selector, offset
+   this selector will select cs descriptor from GDT and check if offset is well within the limit and privlidege level is correct or not(meaning higher pl can access lower pl but to do vice-versa we need some special descriptors like CALL GATE descriptor, not neccesary to know.) If everything goes well, base and limit will give actual pa of that segment.
+
+   This is known as segmentation.
+
+
+### Paging
+
+Physical address space is divided into pages of 4MB(typically). Page table has entries of the pages which are accessible by that process.  Page directory contains list of page tables. Each process has its own page directory. This is 2-level paging. Address converted by segmentation is known as linear adress. Linear adrees is of 32 bits and let's see how it gives pa.
+
+2-LEVEL PAGING :
+
+10      10      12                  
+pde     pte     page
+
+pgdir (2^12 entries and top 10 bits of address
+will give particular entry in pgdir and that entry    --> pagetable(2^12 entries and next 10 bits will
+will contain base address of page table)                            give particular entry in page table and that  --> page(last 12 bits will
+                                                                    entry will point to base address of page)           offset in that page)
+
+
+## User stack and Kernel stack
+
+## TSS
+ 
+## Trap handling
