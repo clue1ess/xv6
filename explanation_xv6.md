@@ -1,6 +1,10 @@
-## xv6 explaination
+# xv6 explaination
 
-BIOS loads first sector(512)(known as bootloader) into a predefined location (0x7c00 for xv6) and jumps to it. It is responsibility of bootloader to find where is rest of kernel in the device and load it into memory and give control to it(jump to first instruction).
+**Reference :** MIT6_828F12_xv6-book-rev7.pdf
+
+## Section 1
+
+BIOS loads first sector(512 bytes)(known as bootloader) into a predefined location (0x7c00 for xv6) and jumps to it. It is responsibility of bootloader to find where is rest of kernel in the device and load it into memory and give control to it(jump to first instruction).
 If the system has multiple processors, first processor boots up and initializes other processors.
 
 Start at 8409 :
@@ -138,7 +142,7 @@ main:
 Every process has two mappings- kernel side and user side. When process is formed, it first get memory in kernel space which will map to pa and that pa will be used to create user side mapping. Also, each process has two stack - user stack and kernel stack.
 
 kinit1:
-    We have KERNBASE-KERNBASE+4MB mapping using entrypgdir. Apart from kcode+kdata area, there is kheap above it. So, we need some data structure which can be used by kalloc and kfree to allocate pages and free pages. kinit1 does this.
+    We have KERNBASE-KERNBASE+4MB mapping using entrypgdir. Apart from kcode+kdata area, there is kheap above it. So, we need some data structure which can be used by kalloc and kfree to allocate pages and free pages. kinit1 does this. 
     After setting up mapping for rest of the kernel, we will then use kinit2 just like we use kinit1. SO, kinit1 (end of kcode+kdata, 4MB) and kinit2(4MB, PHYSTOP). 
     Why two diff functions?
         AT time of kinit1, memory above 4MB is not mapped. It will mapped using kvmalloc().
@@ -219,7 +223,7 @@ switchkvm :
     load cr3 with kernel pgdir(convert va->pa using v2p, remember setupkvm returns pointer in va space)
 
 
-----------------------------------------------------------------------------------------------------------------------------------------------
+## Section 2
 
 // Per−process state
 struct proc {
@@ -238,9 +242,26 @@ struct inode *cwd;          //Current directory
 char name[16];              //Process name (debugging)
 };
 
-trapframe is not valid when process is running in user mode as contents of trapframe are going to change.
-Suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
+Q. what is kernel and user stack?
+-> Each process has two stacks: a user stack and a kernel stack (p­>kstack). When the process is executing user in­
+structions, only its user stack is in use, and its kernel stack is empty. When the pro­ cess enters the kernel (via a system call or interrupt), the kernel code executes on the process’s kernel stack; while a process is in the kernel, its user stack still contains saved
+data, but isn’t actively used. A process’s thread alternates between actively using the user stack and the kernel stack. The kernel stack is separate (and protected from user code) so that the kernel can execute even if a process has wrecked its user stack.
 
+Q. What is trapframe?
+-> 
+
+Q. What is context?
+-> 
+
+Q. If there is context, what is the need for TSS(os_theory.md)?
+->
+
+
+**Note :** 
+1. Trapframe is not valid when process is running in user mode as contents of trapframe are going to change.
+2. Suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
+
+Q. how it works ?theory
 userinit:
 
 1. allocproc -> allocates entry in process table and sets up kernel stack.
@@ -278,9 +299,9 @@ userinit:
     1.4 if not found, release lock on process table and return to main. No space for a new process to run.
 
 2. now, we need physical address space for the process to run. So we need to set pgdir, pgtable and allocate pages. This is due to fact that xv6 uses 2 level paging.
-    setupkvm -> setup page table for kernel address space at first (will see this later).
+    setupkvm -> setup page table for kernel address space at first.
 
-3. init has to execute initcode.S whose binary has to be placed in init's address spce which is done by inituvm
+3. init has to execute initcode.S whose binary has to be placed in init's address space which is done by inituvm
     inituvm -> copies binary of initcode.S into process's memory 
 
         3.1 allocate a page using kalloc
@@ -347,7 +368,7 @@ scheduler:
 3. switch to the process if found. Release of lock should be done by process and reacquire them before coming back to scheduler.
     if not found , release lock on ptable and return.   
     now only initproc is available, so it will switch to it. set per-cpu variable for process(proc) to found process
-4. switchuvm will tell hardware to set up target process's table.
+4. switchuvm will tell hardware to set up target process's table and switch TSS.
     4.1 pushcli?
     4.2 set up TSS(task segment state) to save all kernel registors and kstack and co-processor's data if available.
     4.3 cpu->gdt[].s?
@@ -388,7 +409,7 @@ shell:
     4.4 wait for child to complete
     4.5 continue
 
----------------------------------------------------------------------------------------------------------------------------------
+## Section 3
 
 Scheduler is kernel thread and has its own stack but doesn't have a pgdir associated with it, so it is not a process.
 
@@ -405,7 +426,6 @@ movl 8(%esp), %edx
 eip get changed after ret is called.
 need to refer calling convention.
 
---------------------------------------------------------------------------------------------------------------------------------
 
 fork:
 
@@ -542,7 +562,7 @@ deallocate all user pages from KERNBASE to 0. //need to change to KERNBASE to PA
     2.3 free that page using kfree
     2.4 set that pte to 0.
 
-------------------------------------------------------------------------------------------------------------------------------------
+## Section 4
 
 Trap handling:
 

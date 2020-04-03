@@ -18,14 +18,14 @@ OS = Kernel(will se this later) + System programs(apllication programs like comp
 6. Managing use of main memory.
 7. Providing security to users program.
 
-Reference : https://blogs.siliconindia.com/Jyotionnet/Operating-System--Need--Functions-bid-F941ap7D21007231.html
+**Reference :** https://blogs.siliconindia.com/Jyotionnet/Operating-System--Need--Functions-bid-F941ap7D21007231.html
 
 
 ## Kernel
 
 The kernel is a computer program at the core of a computer's operating system with complete control over everything in the system. It is the "portion of the operating system code that is always resident in memory". It facilitates interactions between hardware and software components. On most systems, it is one of the first programs loaded on startup (after the bootloader) (We will see this later). It handles the rest of startup as well as input/output requests from software, translating them into data-processing instructions for the central processing unit. It handles memory and peripherals like keyboards, monitors, printers, and speakers.
 
-Reference : https://en.wikipedia.org/wiki/Kernel_(operating_system)
+**Reference :** https://en.wikipedia.org/wiki/Kernel_(operating_system)
 
 
 ## How does processor works
@@ -62,7 +62,7 @@ Multi-tasking : Multi-programming + time-sharing.
 
 **Note** : xv6 provides time-sharing.
 
-Reference : https://www.thedailyprogrammer.com/2016/08/processes-in-operating-system.html
+**Reference :** https://www.thedailyprogrammer.com/2016/08/processes-in-operating-system.html
 
 ## Hardware Interrupts
 
@@ -127,7 +127,7 @@ User code-->|           |------->user code
             |---------->|
                OS code
 
-Reference : https://www.geeksforgeeks.org/introduction-of-system-call/
+**Reference :** https://www.geeksforgeeks.org/introduction-of-system-call/
 
 ## Fork 
 
@@ -139,13 +139,13 @@ Negative Value: creation of a child process was unsuccessful.
 Zero: Returned to the newly created child process.
 Positive value: Returned to parent or caller. The value contains process ID of newly created child process.
 
-Reference : https://www.geeksforgeeks.org/fork-system-call/
+**Reference :** https://www.geeksforgeeks.org/fork-system-call/
 
 ## Exec
 
 Exec system call is a functionality of an operating system that runs an executable file in the context of an already existing process, replacing the previous executable. This act is also referred to as an overlay. It is especially important in Unix-like systems, although exists elsewhere. As a new process is not created, the process identifier (PID) does not change, but the machine code, data, heap, and stack of the process are replaced by those of the new program. 
 
-Reference : https://en.wikipedia.org/wiki/Exec_(system_call)
+**Reference :** https://en.wikipedia.org/wiki/Exec_(system_call)
 
 ## Wait and exit
 
@@ -161,7 +161,7 @@ Orphan process :
 Parent is dead before child.
 Generally, first process created called *init* becomes parent of all orphan process and calls wait() on it.
 
-Reference : http://www.csl.mtu.edu/cs4411.ck/www/NOTES/process/fork/wait.html
+**Reference :** http://www.csl.mtu.edu/cs4411.ck/www/NOTES/process/fork/wait.html
 
 ## Shell
 
@@ -195,7 +195,7 @@ Every process has its own memory, registors, stack, data, etc., i.e. every proce
 
 The virtual address space for a process is the set of virtual memory addresses that it can use. The address space for each process is private and cannot be accessed by other processes unless it is shared. A virtual address does not represent the actual physical location of an object in memory.
 
-Reference : https://docs.microsoft.com/en-us/windows/win32/memory/virtual-address-space
+**Reference :** https://docs.microsoft.com/en-us/windows/win32/memory/virtual-address-space
 
 ### Segmentation :
    va(virtual address) --> MMU(memory management unit) --> pa(physical address)

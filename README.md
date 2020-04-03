@@ -59,7 +59,7 @@ Screenshot of output of all above :
 
 ## How to run
 
-Make sure : you have qemu and git installed.
+qemu and git is required to run this. Please install them before proceeding further.
 
 1. Clone this repository using 
 
@@ -82,6 +82,13 @@ Make sure : you have qemu and git installed.
     5. protection3
     6. protection3_
 
+## Theory
+
+I tried to write xv6 explanations which spans over three files:
+
+1. os_theory.md - explained basuc and important os concepts required to understand xv6
+2. explantion_xv6.md - detailed explanation of xv6 (it is in progress!)
+3. functions_xv6.md - list of all functions with their functionality and signature(in progress)
 
 
 
