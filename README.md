@@ -22,7 +22,7 @@ test.c
     ouput should be trap 14 which is page fault which dereferencing null pointer.
     
 Screenshot of output of test.c :
-![Output1] (https://github.com/clue1ess/xv6/blob/master/null_ptr.png)
+![Output1](null_ptr.png)
 
 ## Changing PL of same pages in process's address space
 
@@ -55,7 +55,7 @@ protection3_.c
     changing global variable before mprotect which should print its value and after mprotect, fork the process and munprotect in child, change the value in child and printing its value.
 
 Screenshot of output of all above :
-![Output2] (https://github.com/clue1ess/xv6/blob/master/changing_pl.png)
+![Output2](changing_pl.png)
 
 ## How to run
 
