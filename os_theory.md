@@ -1,8 +1,8 @@
-# Operating system
+# Operating system concepts
 
 **Meta note** : This explanation assume that you have enough understanding of computer organization and assembly language.
 
-**Reference** : My class notes of professor Abhijit A.M.(Operating system) and professor A.A Sawant(Microprocessor Techniques, Computer organization, Advanced Microprocessor Techniques) and video leactures by Sourav Bansal(IITD) and some web links(mentioned in respective sections.)
+**References** : My class notes of professor Abhijit A.M.(Operating system) and professor A.A Sawant(Microprocessor Techniques, Computer organization, Advanced Microprocessor Techniques) and video leactures by Sourav Bansal(IITD) and some web links(mentioned in respective sections.)
 
 ## What is OS?
 
@@ -10,22 +10,22 @@ OS = Kernel(will se this later) + System programs(apllication programs like comp
 
 ## Need of OS:
 
-1. Easy interaction between the human & computer.<br>
-2. Starting computer operation automatically when power in turned on.<br>
-3. Loading & scheduling users program.<br>
-4. Controlling input & output.<br>
-5. Controlling program execution.<br>
-6. Managing use of main memory.<br>
-7. Providing security to users program.<br>
+1. Easy interaction between the human & computer.
+2. Starting computer operation automatically when power in turned on.
+3. Loading & scheduling users program.
+4. Controlling input & output.
+5. Controlling program execution.
+6. Managing use of main memory.
+7. Providing security to users program.
 
-Reference : https://blogs.siliconindia.com/Jyotionnet/Operating-System--Need--Functions-bid-F941ap7D21007231.html<br><br>
+Reference : https://blogs.siliconindia.com/Jyotionnet/Operating-System--Need--Functions-bid-F941ap7D21007231.html
 
 
 ## Kernel
 
-The kernel is a computer program at the core of a computer's operating system with complete control over everything in the system. It is the "portion of the operating system code that is always resident in memory". It facilitates interactions between hardware and software components. On most systems, it is one of the first programs loaded on startup (after the bootloader) (We will see this later). It handles the rest of startup as well as input/output requests from software, translating them into data-processing instructions for the central processing unit. It handles memory and peripherals like keyboards, monitors, printers, and speakers.<br>
+The kernel is a computer program at the core of a computer's operating system with complete control over everything in the system. It is the "portion of the operating system code that is always resident in memory". It facilitates interactions between hardware and software components. On most systems, it is one of the first programs loaded on startup (after the bootloader) (We will see this later). It handles the rest of startup as well as input/output requests from software, translating them into data-processing instructions for the central processing unit. It handles memory and peripherals like keyboards, monitors, printers, and speakers.
 
-Reference : https://en.wikipedia.org/wiki/Kernel_(operating_system)<br><br>
+Reference : https://en.wikipedia.org/wiki/Kernel_(operating_system)
 
 
 ## How does processor works
@@ -112,6 +112,8 @@ CREATE(using fork and exec) ----> READY ----------> RUNNING ----------> TERMINAT
                                 h/w interrupt    wait for I/O
 
 
+
+
 ## System calls
  
 They are kind of software interrupts. A system call is a way for programs to interact with the operating system. A computer program makes a system call when it makes a request to the operating system’s kernel. System call provides the services of the operating system to the user programs via Application Program Interface(API). It provides an interface between a process and operating system to allow user-level processes to request services of the operating system. System calls are the only entry points into the kernel system. 
@@ -176,12 +178,13 @@ Functions:
 
 ## Physical address space
 
-   Memory mapped devices
-   unused
-   Extended memory(RAM)
-   VGA memory
-   BIOS/device
-   Low memory
+   Physical address space |
+   Memory mapped devices |
+   unused |
+   Extended memory(RAM) |
+   VGA memory |
+   BIOS/device |
+   Low memory |
 
 ## Process address space
 
@@ -199,6 +202,8 @@ Reference : https://docs.microsoft.com/en-us/windows/win32/memory/virtual-addres
 
    Each process has four segments. 
    In real addressing mode:
+   pa = va + base(some predefined address like KERNBASE in xv6)
+   In virtual addressing mode:
    The info about starting address of each segment, how much space it needed, what is it priviledge level are stored in descriptor of that segment. Such descriptors are stored in GDT(global descriptor table). GDTR registor is used to find base of GDT. lgdt is instruction used to load base address of GDT into GDTR. 
 
    Decriptor entry :
@@ -240,8 +245,6 @@ will contain base address of page table)                            give particu
                                                                     entry will point to base address of page)           offset in that page)
 
 
-## User stack and Kernel stack
-
 ## TSS
  
-## Trap handling
+Current process's environment has to saved. So, for that system has provision for TSS(Task State Segment). Such space is made available for every task. When task is suspended, its contents are saved in TSS, then trying to refer new TSS wrt new task. TSS contains CS, DS, ES, SS and much more.

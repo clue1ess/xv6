@@ -1,19 +1,5 @@
+## xv6 explaination
 
-
-PROCESS
-A program in execution is called process.  ? need to write more
-
-META NOTE: suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
-
-
-SEGMENTATION
-
-PAGING
-
-
-                                                                    
-
-----------------------------------------------------------------------------------------------------------------------------------------------
 BIOS loads first sector(512)(known as bootloader) into a predefined location (0x7c00 for xv6) and jumps to it. It is responsibility of bootloader to find where is rest of kernel in the device and load it into memory and give control to it(jump to first instruction).
 If the system has multiple processors, first processor boots up and initializes other processors.
 
@@ -33,6 +19,7 @@ start:
         higher addresses may not be available for some machines.
     load GDT:
         meaning initialize gdt descriptor which has base and limit. base = address of gdt and limit = size of (gdt) - 1 (adress of gdt desc - adress of gdt - 1).
+        First descriptor in GDT is always null descriptor.
     contents of gdt:
         1. null descriptor 
             SEG_NULLASM 
@@ -47,18 +34,12 @@ start:
             SEG_ASM(STA_W, 0x0, 0xffffffff)
             has base = 0 and limit = 0xffffffff permissions = write(STA_W)
 
-            How is descriptor stored exactly?
-                bootloader puts data and code at 1MB initially, so code and data descriptors should be placed from 0 to 1MB-1 PA space
-                Therfore, 
-
-                
-
-             Q.limit uses upper 20 bits, why?
-             Q. why code and data has same mapping 0 to limit?
+        Q%%. why code and data has same mapping 0 to limit?
 
 
 4. Enter protected mode.
     set protected enabled bit in control registor #0 (CR0)
+    Note: There are control registore required by processor CR0 - CR4. Each CR has different and special meaning to each bit.
 5. Enter 32 bit mode using ljmp to start32 as cs caanot be modified directly.
     selector has 13 bit index, 1 bit whether it is LDT or GDT(leave it), 2 bits for priviledge level.
     ljmp cs:ip 
@@ -112,7 +93,9 @@ Implementation:
 6. get starting point of execution of kernel using elf->entry and cast to function pointer and switch to it.
 
 Note: Kernel generally loads at 0x100000 (pa) because first 1MB is reserved for memory mapped devices, like console, etc.
+
 Q. What are memory mapped devices? 
+-->Memory mapped I/O is a way to exchange data and instructions between a CPU and peripheral devices attached to it. Memory mapped IO is one where the processor and the IO device share the same memory location(memory),i.e.,the processor and IO devices are mapped using the memory address.
 
 entry:
     Kernel has to enable paging and setup high virtual adresses.
@@ -121,7 +104,7 @@ entry:
 2. set up stack pointer at high address in kernel va.
 3. jump to main.
 
-1. Set up large pages for kernel.(there are large pages of size 4MB and small pages of size 4KB)
+1. Set up large pages for kernel.(There are large pages of size 4MB and small pages of size 4KB, mostly kernel uses large pages and user process uses small pages.)
 2. load cr3 with entrypgdir(convert va->pa using V2P_WO). cr3 anyways take pa.
     kernel executable has code compiled which has all address above KERNBASE, but we haven't set va yet.
 
@@ -152,7 +135,7 @@ Now, esp and eip both will point above KERNBASE.
 
 main:
 
-Every process has two mappings- kernel side and user side. When process is formed, it first get memory in kernel space which will map to pa and that pa will be used to create user side mapping.
+Every process has two mappings- kernel side and user side. When process is formed, it first get memory in kernel space which will map to pa and that pa will be used to create user side mapping. Also, each process has two stack - user stack and kernel stack.
 
 kinit1:
     We have KERNBASE-KERNBASE+4MB mapping using entrypgdir. Apart from kcode+kdata area, there is kheap above it. So, we need some data structure which can be used by kalloc and kfree to allocate pages and free pages. kinit1 does this.
@@ -176,9 +159,7 @@ kvmalloc :
 
 Q. what happens to entrypgdir?
 ->it is static array allocated, so can't be deallocted while kpgdir is allocated through kernel heap and hence can be deallocated.
-
-Note: os follows a covention that never map 0 address, meaning 0 address will not be a valid address.
-
+ 
 setupkvm:
     set up kernel page table. Setupkvm returns pointer to kpgdir which is in va.
 1. allocate a page using kalloc(still in kERNBASE-KERNBASE+4MB va space)
@@ -209,7 +190,7 @@ mappages:
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page−aligned.
-//lazy allocation as don't allocate everything at starting
+// lazy allocation meaning don't allocate everything at starting
 
 1. determine no of pages meaning page table entries you want. 
     start = va & ~(pgsize-1)
@@ -258,7 +239,7 @@ char name[16];              //Process name (debugging)
 };
 
 trapframe is not valid when process is running in user mode as contents of trapframe are going to change.
-
+Suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
 
 userinit:
 
@@ -632,3 +613,13 @@ call sys[syscall_no]. //system call no is stored in eax in tf.
 sys_exec:
 I don't understand, need to understand setting up user stack.
 
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows}
+\tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30]
+\begin{tikzpicture}[node distance=2cm]
+\node (pro1) [process] {CREATE};
+\node (pro2) [process, xshift=1.0cm] {READY};
+\node (pro3) [process, xshift=1.0cm] {RUNNING};
+\node (pro4) [process, xshift=1.0cm] {TERMINATED};
+\node (pro5) [process, below of=pro2, yshift=-0.5cm, xshift=0.5cm] {WAIT};
+\end{tikzpicture}
