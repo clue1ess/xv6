@@ -86,9 +86,9 @@ qemu and git is required to run this. Please install them before proceeding furt
 
 I tried to write xv6 explanations which spans over three files:
 
-1. os_theory.md - explained basuc and important os concepts required to understand xv6
-2. explantion_xv6.md - detailed explanation of xv6 (it is in progress!)
-3. functions_xv6.md - list of all functions with their functionality and signature(in progress)
+1. os_theory.md - explained basic and important os concepts required to understand xv6
+2. explantion_xv6.md - detailed explanation of xv6 (whatever required for this problem statement)
+3. functions_xv6.md - list of all functions with their functionality and signature
 
 
 

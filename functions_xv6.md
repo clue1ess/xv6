@@ -107,4 +107,3 @@
     Set up interrupt descriptors in kernel mode and system calls for user mode.
     `void tvinit(void)`
 
-29. trap

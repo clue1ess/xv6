@@ -243,25 +243,51 @@ char name[16];              //Process name (debugging)
 };
 
 Q. what is kernel and user stack?
--> Each process has two stacks: a user stack and a kernel stack (p­>kstack). When the process is executing user in­
-structions, only its user stack is in use, and its kernel stack is empty. When the pro­ cess enters the kernel (via a system call or interrupt), the kernel code executes on the process’s kernel stack; while a process is in the kernel, its user stack still contains saved
-data, but isn’t actively used. A process’s thread alternates between actively using the user stack and the kernel stack. The kernel stack is separate (and protected from user code) so that the kernel can execute even if a process has wrecked its user stack.
+-> Each process has two stacks: a user stack and a kernel stack. When the process is executing user in­structions, only its user stack is in use, and its kernel stack is empty. When the pro­ cess enters the kernel (via a system call or interrupt), the kernel code executes on the process’s kernel stack; while a process is in the kernel, its user stack still contains saved data, but isn’t actively used. A process’s thread alternates between actively using the user stack and the kernel stack. The kernel stack is separate (and protected from user code) so that the kernel can execute even if a process has wrecked its user stack.
 
 Q. What is trapframe?
--> 
+-> Whenever control transfers into the kernel while a process is running, the hardware and xv6 trap entry code save user registers on the process’s kernel stack. OS writes values at the top of the new stack that look just like those that would be there if the process had entered the kernel via an interrupt, so that the or­ dinary code for returning from the kernel back to the process’s user code will work.
+These values are a struct trapframe which stores the user registers.
 
 Q. What is context?
--> 
+-> When kernel is executing in place of process, the registors it requires get copies from kernel stack which is pointed by p->context.  
 
-Q. If there is context, what is the need for TSS(os_theory.md)?
-->
+Q. If there is context, what is the need for TSS?
+-> I think TSS stores user's registors and stack values for every priviledge level and interrupt table while context store kernel's registors.
 
 
 **Note :** 
-1. Trapframe is not valid when process is running in user mode as contents of trapframe are going to change.
-2. Suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
+1. The ss and sp of kernel stack are stored in TSS.
+2. Trapframe is not valid when process is running in user mode as contents of trapframe are going to change.
+3. Suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
 
-Q. how it works ?theory
+**Creating the first process** :
+
+1. We need PCB for running any process. So, need to allocate one. Allocproc() does this. It checks UNUSED entry in proc table and if found, 
+changed the state to EMBRYO (meaning only PCB is allocated and kernel satck and page directory is not allocated).
+2. Allocate kernel stack for this process and if everything goes fine, change the state to UNUSED.
+3. Now, we need to setup kernel stack. Kernel stack is setup in following manner. 
+4. First, we setup trapframe which is used to save user's registors. 
+5. Now, iret instructions pops off only 5 registors - cs, ip, ss, sp and flag, rest others also need to pop off, so this is done by traret function. By calling convention, trapret return address is stored after trapframe. 
+6. forkret is the function which returns to trapret meaning address of forkret is stored just after trapret. This is the case for the forked process but xv6 does not consider special case for first process.
+7. Next thing is before doing anything in kernel side, it saves kernel registors in its context.  
+8. In between context and forkret, there can be many chain of function calls.
+
+    esp | <- top of new stack
+    ... |
+    eip |
+    ... |
+    edi | <- p->tf
+ trapret| <- address at which forkret will return
+    eip |
+    ... |
+    edi | <- p->context
+  empty | <- p->kstack
+
+9. Now, we need to create a page table for the process with (at first) mappings only for memory that the kernel uses. 
+The initial contents of the first process’s memory are the compiled form of init­ code.S.
+10. Once the process is initialize, set the state to RUNNABLE so that scheduler can schedule it fir running.
+
 userinit:
 
 1. allocproc -> allocates entry in process table and sets up kernel stack.
@@ -321,19 +347,18 @@ userinit:
             -> kstack
                 trapframe
                 trapret
-                forkret?
-                context?
+                forkret
+                context
             forkret returns to trapret, trapret pops all registers like ueax, ubax, etc. except ucs, ueip, ueflag, uss, usp which are poped by h/w. so ueip should point to beginning of process.
-    4.7 set name of directory for debugging purpose ?
-    4.8 safestrcpy ?
-    4.9 set state of process = RUNNABLE (meaning ready to run, scheduler can schedule it)
-
+    4.7 set name of directory for debugging purpose.
+    4.8 safestrcpy to copy name of process into proc struct.
+    4.9 set state of process = RUNNABLE
 now next thing is to call scheduler and start executing init.
 mpmain calls scheduler.
 
 mpmain:
 1. calls idtinit which calls lidt to load ist registor
-2. calls xchg?
+2. calls xchg
 
 // Per−CPU state
 struct cpu {
@@ -352,8 +377,9 @@ so maybe xchg will say that particular cpu has been started and will make common
 
 3. calls scheduler
 
-
 scheduler:
+
+Scheduler is kernel thread and has its own stack but doesn't have a pgdir associated with it, so it is not a process. Every xv6 process has its own kernel stack and register set. Each CPU has a separate scheduler thread for use when it is executing the sched­ uler rather than any process’s kernel thread. Switching from one thread to another in­volves saving the old thread’s CPU registers, and restoring previously­ saved registers of the new thread; the fact that %esp and %eip are saved and restored means that the CPU will switch stacks and switch what code it is executing.
 
 // Per−CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -369,25 +395,58 @@ scheduler:
     if not found , release lock on ptable and return.   
     now only initproc is available, so it will switch to it. set per-cpu variable for process(proc) to found process
 4. switchuvm will tell hardware to set up target process's table and switch TSS.
-    4.1 pushcli?
+    4.1 pushcli - pops eflag and cli
     4.2 set up TSS(task segment state) to save all kernel registors and kstack and co-processor's data if available.
-    4.3 cpu->gdt[].s?
+    4.3 cpu->gdt[].s - There are two types of descriptor system and segment which is denoted by s bit in ARB(remember Access Right Bytes in descriptor) of descriptor. So, TSS requires system descriptor. 
     4.4 set SEG_KDATA and SEG_KSTACK(va) in TSS
-    4.5 ltr?
+    4.5 ltr - load task register
     4.6 lcr3 switch address space. address spce of current process meanimg its pgdir is in p->pgdir which is va. so, need to convert va -> pa by subtracting KERNBASE.
-    4.7 popcli?
+    4.7 popcli - pos eflag and sti
 5. set process's state to running
-6. swtch -> saves old context and loads new context. so old = cpu->scheduler(scheduler's context) and new = proc->context
+6. swtch -> saves old context and loads new context. so old = cpu->scheduler(scheduler's context) and new = proc->context.(will see this later.)
 7. switchkvm -> switch to kernel page table after process is done. 
 8. when process is done, it should set appropriate state itself  and come back to scheduler
     scheduler set proc variable to 0
     loops again.
 
+Switching context while scheduling:
+
+void swtch(struct context **old, struct context *new);
+//Save current register context in old
+//and then load register context from new.
+
+Swtch starts by loading its arguments off the stack into the registers %eax and %edx; swtch must do this before it changes the stack pointer and can no longer access the arguments via %esp. Then swtch pushes the register state, creating a context structure on the current stack. Only the callee­ save registers need to be saved; the convention on the x86 is that these are %ebp, %ebx, %esi, %ebp, and %esp.
+
+Swtch pushes the first four explicitly ; it saves the last implicitly as the struct context* written to *old. There is one more important register: the program counter %eip was saved by the call instruction that invoked swtch and is on the stack just above %ebp. Having saved the old context, swtch is ready to restore the new one. It moves the pointer to the new context into the stack pointer (2720) . The new stack has the same form as the old one that swtch just left—the new stack was the old one in a previous call to swtch—so swtch can invert the sequence to re­store the new context. It pops the values for %edi, %esi, %ebx, and %ebp and then returns. Because swtch has changed the stack pointer, the values restored and the instruction address returned to are the ones from the new context.
+
+**How system call works?**
+
+1. Push the arguments required by the syscall and then push return address of the function.
+2. Put system call no which you want into eax registor.
+3. execute int instruction with trap no assigned to make syscall which is 64(macro - T_SYSCALL) in xv6.
+Now what does syscall do?
+1. it check the syscall no in eax is valid no or not.
+2. If it is, call appropriate function.
 
 initcode.S :
 
-    Its function is to call exec systemcall with arguments init. There is list of system calls maintained with their syscall numbers. So, SYS_exec is macro for sys_exec no.
-    How sys_exec works? 
+    Its function is to call exec systemcall with arguments init. As we know, the format required for arguments of exec - {name of program, arguments .. , NULL}. There is list of system calls maintained with their syscall numbers. So, SYS_exec is macro for sys_exec no.
+
+    The helper functions argint and argptr, argstr retrieve the n’th system call argument, as either an integer, pointer, or a string.
+    argint uses the user­space %esp register to locate the n’th argument: %esp points at the return address. The arguments are right above it, at %esp+4. Then the nth argument is at %esp+4+4*n.
+
+    argint calls fetchint to read the value at that address from user memory and write it to *ip. fetchint can simply cast the address to a pointer, because the user and the kernel share the same page table, but the kernel must verify that the pointer by the user is indeed a pointer in the user part of the address space. argstr interprets the nth argument as a pointer. It ensures that the pointer points at a NUL­L terminated string and that the complete string is located below the end of the user part of the address space.
+
+    sys_exec :
+        1. fetch 0 argument i.e. name of the program as str into path.
+        2. fetch 1 argumnet i.e. {arguments .. , NULL} as int.
+        3. now loop over all the arguments :
+            3.1 fetch it as int and check validity
+            3.2 convert it into str
+            3.3 save it into array
+        4. call exec with path and array(argv).
+    
+    exec will execute(will see detailed explanation in Section3)
 
 After exec, user-level init will get executed.
 init:
@@ -411,21 +470,6 @@ shell:
 
 ## Section 3
 
-Scheduler is kernel thread and has its own stack but doesn't have a pgdir associated with it, so it is not a process.
-
-Switching context while scheduling:
-
-void swtch(struct context **old, struct context *new);
-//Save current register context in old
-//and then load register context from new.
-
-Q. what is first two mov instructions doing?
-movl 4(%esp), %eax
-movl 8(%esp), %edx
-
-eip get changed after ret is called.
-need to refer calling convention.
-
 
 fork:
 
@@ -438,7 +482,7 @@ fork the process meaning create a copy of process
 6. set eax reg(return value) to 0 in child's tf
 7. now copy open files table(idt should expore this, not needed for now)
 8. set proc->state = RUNNABLE if everything went fine.
-9. safestrcpy?
+9. safestrcpy copies name of program.
 10. fork should return pid of child in parent, so proc->pid should be returned.
 
 
@@ -475,7 +519,7 @@ replace the process's memory with given program's image.
 8. change proc->pgdir to point to new pgdir allocated above.
 9. change proc->esp to sp in 6.2.1
 10. change proc->entry to elf.entry
-11. proc->sz = sz which is obtained while loading th eprogram in 4. //need to change this for null pointer i think. sz - PGSIZE
+11. proc->sz = sz which is obtained while loading th eprogram in 4. 
 12. switch to the process using switchuvm.
 13. free the old pgdir and its allocated pages using freevm.
 
@@ -522,6 +566,7 @@ clear U flag in pte
 
 copyout:
 
+uva2ka :
 
 freevm:
 
@@ -554,8 +599,8 @@ kalloc :
 
 deallocuvm:
 
-deallocate all user pages from KERNBASE to 0. //need to change to KERNBASE to PAGESIZE
-1. find toatl no of pages
+deallocate all user pages from KERNBASE to 0. 
+1. find total no of pages
 2. iterate over total pages
     2.1 find pte in pgdir using walkpgdir
     2.2 compute pa using pte 
@@ -565,16 +610,6 @@ deallocate all user pages from KERNBASE to 0. //need to change to KERNBASE to PA
 ## Section 4
 
 Trap handling:
-
-initcode.S
-We have seen that this code does exec and then user level program init runs which will fork and run shell thereafter.
-How exec works?
-
-start:(7707)
-
-1. push arguments to user stack ?
-2. mov system call number to eax
-3. There are idt for each interrupt which is identified by interrupt no. For syscall, interrupt no is 64(T_SYSCALL). Interrupt can be called using int instruction. write what does int do?(afterwards)
 
 There is table idt (interrupt descriptor table) which has list of interrupt descriptors for interrupt no(256 entries in total). tvinit from main(which calls kinit1, userinit, etc.) sets up all these entries.
 
@@ -600,46 +635,12 @@ Diff bet trap and interrupt ?
 
 When trap/interrupt occurs, if processor is in user mode, it needs to change from user mode to kernel mode(using switchuvm). Also, while switching, registors should be saved on kernel stack not on user stack.
 
-//from the book
-When a trap occurs, the processor hardware does the following. If the processor
-was executing in user mode, it loads %esp and %ss from the task segment descriptor,
-pushes the old user %ss and %esp onto the new stack. If the processor was executing
-in kernel mode, none of the above happens. The processor then pushes the %eflags,
-%cs, and %eip registers. For some traps, the processor also pushes an error word.
-The processor then loads %eip and %cs from the relevant IDT entry.
-xv6 uses a Perl script (2950) to generate the entry points that the IDT entries point
-to. Each entry pushes an error code if the processor didn’t, pushes the interrupt num­
-ber, and then jumps to alltraps.
-Syscall records the return value of the system call function in %eax. When the
-trap returns to user space, it will load the values from cp­>tf into the machine regis­
-ters. Thus, when exec returns, it will return the value that the system call handler re­
-turned
+When a trap occurs, the processor hardware does the following. If the processor was executing in user mode, it loads %esp and %ss from the task segment descriptor, pushes the old user %ss and %esp onto the new stack. If the processor was executing
+in kernel mode, none of the above happens. The processor then pushes the %eflags, %cs, and %eip registers. For some traps, the processor also pushes an error word.
+The processor then loads %eip and %cs from the relevant IDT entry. xv6 uses a Perl script to generate the entry points that the IDT entries point to. Each entry pushes an error code if the processor didn’t, pushes the interrupt num­ber, and then jumps to alltraps.
 
-Had to see perl script??
-skipping stack setup and switching mode for now(alltraps).
-
-what alltraps does some work and then call trap.
+alltraps :
 
 trap:
 
-1. It checks whether int T_SYSCALL is used to call trap.
-2. calls syscall.
-
-syscall:
-
-call sys[syscall_no]. //system call no is stored in eax in tf.
-//list of syscall[] referring to particular system call no
-
-sys_exec:
-I don't understand, need to understand setting up user stack.
-
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows}
-\tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30]
-\begin{tikzpicture}[node distance=2cm]
-\node (pro1) [process] {CREATE};
-\node (pro2) [process, xshift=1.0cm] {READY};
-\node (pro3) [process, xshift=1.0cm] {RUNNING};
-\node (pro4) [process, xshift=1.0cm] {TERMINATED};
-\node (pro5) [process, below of=pro2, yshift=-0.5cm, xshift=0.5cm] {WAIT};
-\end{tikzpicture}
+trapret :
