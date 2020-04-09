@@ -514,7 +514,15 @@ replace the process's memory with given program's image.
     6.2 use this page for user stack
         6.2.1 set sp point to second page ending from below, as stack grows downwards toward 0.
         Now refer to user stack below to understand further.
-        6.2.2 need to refer something?
+        6.2.2 loop over arguments:
+            6.2.2.1 move new process stack pointer so there's room for current argument
+            6.2.2.2 copy argument to actual new process user-stack
+            6.2.2.3 make argv vector entry (which is still in temporary ustack variable!) point to current argument that we just pushed to stack
+            6.2.2.4 put 0 in last entry of argv vector (which is still in temporary ustack variable!), as is expected by convention
+            6.2.2.5 put -1 as return address in appropriate spot in temporary ustack variable
+            6.2.2.6 put argc in appropriate spot in temporary ustack variable
+            6.2.2.7 put address of where argv will be in new user-stack (but isn't there yet) in appropriate spot in temporary ustack variable
+            6.2.2.8 now that all arguments are copied to new user-stack, and we know where to place return address & argc & argv, copy ustack variable to new process user-stack
 7. save program name for debugging
 8. change proc->pgdir to point to new pgdir allocated above.
 9. change proc->esp to sp in 6.2.1
@@ -537,7 +545,7 @@ argument 0
 argc
 0xFFFFFFF
 (empty)
-
+    
 
 allocuvm:
 
@@ -566,10 +574,20 @@ clear U flag in pte
 
 copyout:
 
+// Copy len bytes from p to user address va in page table pgdir.
+
+1. get va offset within its page using uva2ka
+2. copy data using memmove
+
+
 uva2ka :
+
+1. Find out if the address given in user sapce or not.
+2. If it is, return physical offset in pte for that va.
 
 freevm:
 
+//Free a page table and all the physical memory pages in the user part.
 free pgdir. First free user part(can be variable in size) and then kernel entries (fixed NPDENTRIES).
 1. free user pages using deallocuvm
 2. free kernel part. Iterate over NPDENTRIES :
@@ -641,6 +659,20 @@ The processor then loads %eip and %cs from the relevant IDT entry. xv6 uses a Pe
 
 alltraps :
 
+1. build trapframe (meaning push ds, es, fs, gs registors into kstack)
+2. set up code and data segments for kernel 
+3. push kernel stack pointer
+4. call the trap.
+
 trap:
 
+1. Find the trap no in tf->eax.
+2. If it is trap no 64 i.e T_SYSCALL, 
+    2.1 Check if the processor is killed or not.
+    2.2 call syscall.
+3. Else find the appropriate handler for trap occured and do the appropritae action.
+
 trapret :
+    
+1. Pops offs other user's registors that are not poped by hardware(which are ss, sp, flag, cs, ip   ) and errocode if any.
+2. iret so that hardware can pops off remaining registors.

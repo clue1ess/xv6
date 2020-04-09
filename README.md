@@ -77,11 +77,12 @@ qemu and git is required to run this. Please install them before proceeding furt
 6. Terminal will appear
     For test files output, these are names of executable files :
     1. test
-    2. protection_lev
-    3. protection2
-    4. protection2_
-    5. protection3
-    6. protection3_
+    2. test1
+    3. protection_lev
+    4. protection2
+    5. protection2_
+    6. protection3
+    7. protection3_
 
 ## Theory
 

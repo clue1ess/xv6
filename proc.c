@@ -541,19 +541,15 @@ mprotect(void *addr, int len)
   pde_t *pde;
   char *va;
   int i;
- // cli();
-  //printf(1, "mprotectaddr = %s, len = %d\n", (char*)addr, len); 
   if(len <= 0)
     return -1;
-  //page-aligned or not
- // va = (char *)addr;
   if((uint)PGROUNDDOWN((uint)addr) != (uint)addr)
     return -1;	
 	for(i = 0; i < len; i += 1) {
 		va =(char*)((uint)addr + i*PGSIZE);
 		pde = &curproc->pgdir[PDX((void *)va)];
 		if(pde == 0)
-			return -1;
+		  return -1;
 		if(*pde & PTE_P && *pde & PTE_U) {
 			pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
 			if(pgtab == 0)
@@ -586,38 +582,35 @@ munprotect(void *addr, int len)
   pde_t *pde;
   char *va;
   int i;
-  //printf(1, "addr = %s, len = %d\n", (char*)addr, len); 
   if(len <= 0)
     return -1;
-  //page-aligned or not
- // va = (char *)addr;
   if((uint)PGROUNDDOWN((uint)addr) != (uint)addr)
     return -1;
-       for(i = 0; i < len; i += 1) {
-                va = (char *)(((uint)addr) + i*PGSIZE);
-                pde = &curproc->pgdir[PDX(va)];
+  for(i = 0; i < len; i += 1) {
+    va = (char *)(((uint)addr) + i*PGSIZE);
+    pde = &curproc->pgdir[PDX(va)];
 		if(pde == 0)
 			return -1;
-                if(*pde & PTE_P && *pde & PTE_U) {
-                        pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
+    if(*pde & PTE_P && *pde & PTE_U) {
+      pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
 			if(pgtab == 0)
 				return -1;
-                        // *pde = *pde & ~PTE_W;
-                        pte = &pgtab[PTX(va)];
+      // *pde = *pde & ~PTE_W;
+      pte = &pgtab[PTX(va)];
 			if(pte == 0)
 				return -1;
-                        if(*pte & PTE_P) {
-                               // *pde = *pde | PTE_W;
-                                *pte = *pte | PTE_W;
-                        }
-                        else
-                                return -1;
-                }
-                else
-                        return -1;
-        }
-        //need to check if pgdir has to loaded into current proc struct or not  
-        lcr3(V2P(curproc->pgdir));
-        return 0;
+      if(*pte & PTE_P) {
+        // *pde = *pde | PTE_W;
+        *pte = *pte | PTE_W;
+      }
+      else
+        return -1;
+    }
+    else
+      return -1;
+  }
+  //need to check if pgdir has to loaded into current proc struct or not  
+  lcr3(V2P(curproc->pgdir));
+  return 0;
 }
 
