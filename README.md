@@ -18,11 +18,12 @@ syscall.c
 
 Test file : 
 
-test.c
-    ouput should be trap 14 which is page fault which dereferencing null pointer.
+test.c, test1.c:
+    output should be trap 14 which is page fault which dereferencing null pointer.
     
-Screenshot of output of test.c :
+Screenshot of output of test.c and test1.c :
 ![Output1](null_ptr.png)
+![Output2](null_ptr2.png)
 
 ## Changing PL of same pages in process's address space
 
@@ -55,7 +56,7 @@ protection3_.c
     changing global variable before mprotect which should print its value and after mprotect, fork the process and munprotect in child, change the value in child and printing its value.
 
 Screenshot of output of all above :
-![Output2](changing_pl.png)
+![Output3](changing_pl.png)
 
 ## How to run
 
