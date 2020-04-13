@@ -1,4 +1,4 @@
-//test file taken from : https://github.com/aditvenk/xv6_virtual_memory/blob/master/user/tester.c
+//reference: https://github.com/aditvenk/xv6_virtual_memory/blob/master/user/tester.c
 
 #include "types.h"
 #include "stat.h"
@@ -11,8 +11,6 @@
 int ppid;
 
 #define assert(x) if (x) {} else { \
-   printf(1, "%s: %d ", __FILE__, __LINE__); \
-   printf(1, "assert failed (%s)\n", # x); \
    printf(1, "TEST FAILED\n"); \
    kill(ppid); \
    exit(); \
@@ -28,6 +26,9 @@ main(int argc, char *argv[])
    sbrk(PGROUNDUP(brk) - (uint)brk);
    char *start = sbrk(0);
 
+   assert(munprotect((void *)0, 1) == -1);
+   assert(munprotect((void *)0, 1) == -1);
+
    assert(mprotect(start, 0) == -1);
    assert(munprotect(start, 0) == -1);
 
@@ -38,7 +39,7 @@ main(int argc, char *argv[])
    assert(munprotect(start, 1) == -1);
 
    sbrk(PGSIZE * 1);
-
+   
    assert(mprotect(start, 1) == 0);
    assert(munprotect(start, 1) == 0);
 
