@@ -21,8 +21,9 @@ Test file :
 test.c, test1.c:
     output should be trap 14 which is page fault which dereferencing null pointer.
     
-Screenshot of output of test.c and test1.c :
+Screenshot of output of test.c (before and after adding null ptr dereference code) :
 ![Output1](null_ptr.png)
+Screenshot of output of test1.c :
 ![Output2](null_ptr2.png)
 
 ## Changing PL of same pages in process's address space
