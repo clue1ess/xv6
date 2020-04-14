@@ -553,7 +553,7 @@ mprotect(void *addr, int len)
 		if(*pde & PTE_P && *pde & PTE_U) {
 			pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
 			if(pgtab == 0)
-				return -1; //need to check once
+				return -1; 
 			// *pde = *pde & ~PTE_W;
 			pte = &pgtab[PTX(va)];
 			if(pte == 0)
@@ -568,7 +568,6 @@ mprotect(void *addr, int len)
 		else 
 			return -1;
 	}
-	//need to check if pgdir has to loaded into current proc struct or not	
 	lcr3(V2P(curproc->pgdir));
 	return 0;
 }
@@ -609,7 +608,7 @@ munprotect(void *addr, int len)
     else
       return -1;
   }
-  //need to check if pgdir has to loaded into current proc struct or not  
+  
   lcr3(V2P(curproc->pgdir));
   return 0;
 }
