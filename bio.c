@@ -139,6 +139,39 @@ brelse(struct buf *b)
   
   release(&bcache.lock);
 }
+
+
+void 
+write_page_to_disk(char *temp, uint b)
+{
+  int i;
+  struct buf *buff;
+  for(i = 0; i < 8; i++) {
+    begin_op();
+		buff = bget(ROOTDEV, b+i);
+    memmove(buff->data, temp + i * BSIZE, BSIZE);
+    log_write(buff);
+		brelse(buff);
+		end_op();
+    
+  }
+}
+
+void
+read_page_from_disk(char *temp, uint b) 
+{
+  int i;
+  struct buf *buff;
+  for(i = 0; i < 8; i++) {
+    //begin_op();
+		buff = bread(ROOTDEV, b+i);
+    memmove(temp + i * BSIZE, buff->data, BSIZE);
+		brelse(buff);
+		//end_op();
+    
+  }
+
+}
+
 //PAGEBREAK!
 // Blank page.
-

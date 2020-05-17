@@ -36,6 +36,7 @@ idtinit(void)
 void
 trap(struct trapframe *tf)
 {
+  uint addr;
   if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
       exit();
@@ -47,6 +48,21 @@ trap(struct trapframe *tf)
   }
 
   switch(tf->trapno){
+  case T_PGFLT:
+    cprintf("entered into trap");
+    addr = rcr2();
+    if(addr == 0) {
+      cprintf("pid %d %s: trap %d err %d on cpu %d "
+            "eip 0x%x addr 0x%x--kill proc\n",
+            myproc()->pid, myproc()->name, tf->trapno,
+            tf->err, cpuid(), tf->eip, rcr2());
+      myproc()->killed = 1;
+      break;
+    }
+    else {
+      pgfault_handler();
+      break;
+    }
   case T_IRQ0 + IRQ_TIMER:
     if(cpuid() == 0){
       acquire(&tickslock);

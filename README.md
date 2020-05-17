@@ -22,9 +22,9 @@ test.c, test1.c:
     output should be trap 14 which is page fault which dereferencing null pointer.
     
 Screenshot of output of test.c (before and after adding null ptr dereference code) :
-![Output1](null_ptr.png)
+![Output1](screenshots/null_ptr.png)
 Screenshot of output of test1.c :
-![Output2](null_ptr2.png)
+![Output2](screenshots/null_ptr2.png)
 
 ## Changing PL of same pages in process's address space
 
@@ -57,7 +57,7 @@ protection3_.c
     changing global variable before mprotect which should print its value and after mprotect, fork the process and munprotect in child, change the value in child and printing its value.
 
 Screenshot of output of all above :
-![Output3](changing_pl.png)
+![Output3](screenshots/changing_pl.png)
 
 ## How to run
 
@@ -90,8 +90,30 @@ qemu and git is required to run this. Please install them before proceeding furt
 I tried to write xv6 explanations which spans over three files:
 
 1. os_theory.md - explained basic and important os concepts required to understand xv6
-2. explantion_xv6.md - detailed explanation of xv6 (whatever required for this problem statement)
+2. explantion_xv6.md - detailed explanation of xv6 (not everything!)
 3. functions_xv6.md - list of all functions with their functionality and signature
 
+## Demand paging + swapping
+
+I implemented demand paging and swapping in xv6. The core logic is taken from https://github.com/RhythmIIITD/AOS-Demand-Paging/blob/master/proj.pdf.
+For implementation purpose, I referred to following github repos and I did look into the code, so has something similiar to them :
+
+1. https://github.com/RhythmIIITD/AOS-Demand-Paging
+2. https://github.com/vshan/xv6p
+3. https://github.com/Systems-IIITD/xv6-paging
+4. https://github.com/bhupesh17040/xv6-Memory-Management
+
+But my implementation uses bits (for representing flags in  page entry) in a different way than all of these repos. Also, implementation of algorithm for selecting a victim is different.
+
+The main intent behind this is to understand how demand paging and swapping is implemented as concept is easy to understand but challenging to implement!
+
+Outputs :
+
+!(memtest1)[screenshots/]
+!(memtest2)[screenshots/]
+!(memtest3)[screenshots/]
+
+**Incomplete**
+There are three test cases memtest1, memtest2, memtest3 which is also taken from https://github.com/RhythmIIITD/AOS-Demand-Paging.  Code works fine if first memtest2 runs and then rest. But if I run memtest2 after memtest1, test is failed and I don't know why now. But trying to figure it out.
 
 

@@ -9,12 +9,15 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+typedef uint pte_t;
 
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
 void            brelse(struct buf*);
 void            bwrite(struct buf*);
+void            write_page_to_disk(char *temp, uint b);
+void            read_page_from_disk(char *temp, uint b);
 
 // console.c
 void            consoleinit(void);
@@ -52,6 +55,8 @@ struct inode*   nameiparent(char*, char*);
 int             readi(struct inode*, char*, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, char*, uint, uint);
+uint            balloc_page(void);
+void            balloc_free(uint b);
 
 // ide.c
 void            ideinit(void);
@@ -187,6 +192,11 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+void            swap_page_from_pte(pde_t *pgdir, pte_t *pte);
+pte_t *         walkpgdir(pde_t *pgdir, const void *va, int alloc);
+void            pgfault_handler(void);
+void            swap(pde_t *pgdir);
+
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

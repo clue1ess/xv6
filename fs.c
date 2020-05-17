@@ -26,7 +26,7 @@ static void itrunc(struct inode*);
 // there should be one superblock per disk device, but we run with
 // only one device
 struct superblock sb; 
-
+int numallocblocks = 0;
 // Read the super block.
 void
 readsb(int dev, struct superblock *sb)
@@ -93,6 +93,51 @@ bfree(int dev, uint b)
   log_write(bp);
   brelse(bp);
 }
+
+/* balloc page() allocates 4 KB consecutive disk
+space and returns the address of first disk block.*/
+
+uint 
+balloc_page(void) 
+{
+  static int flag = 0;
+  int i, no = (4 * 1024) / 512;
+  uint blocks[no];
+  if(!flag) {
+    flag++;
+    numallocblocks = 0;
+  }
+  for(i = 0; i < no; i++) {
+    cprintf("allocated %d block:", i);
+    begin_op();
+    blocks[i] = balloc(ROOTDEV);
+    /*if(blocks[i] == -1) {
+      for(j = 0; j < i; j++) 
+        bfree(ROOTDEV, blocks[i]);
+      cprintf("cannot allocate blocks");
+    }*/
+    end_op();
+  }
+  numallocblocks++;
+  return blocks[0];
+}
+
+/**balloc_free() frees 4KB consecutive disk space */
+
+void 
+balloc_free(uint b)
+{
+  uint i;
+  for(i = 0; i < 8; i++) {
+    begin_op();
+    bfree(ROOTDEV, b+i);
+    end_op();
+  }
+  numallocblocks--;
+}
+
+
+
 
 // Inodes.
 //

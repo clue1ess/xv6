@@ -32,7 +32,7 @@ seginit(void)
 // Return the address of the PTE in page table pgdir
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page table pages.
-static pte_t *
+pte_t *
 walkpgdir(pde_t *pgdir, const void *va, int alloc)
 {
   pde_t *pde;
@@ -256,7 +256,7 @@ int
 deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 {
   pte_t *pte;
-  uint a, pa;
+  uint a, pa, blockno;
 
   if(newsz >= oldsz)
     return oldsz;
@@ -273,6 +273,10 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       char *v = P2V(pa);
       kfree(v);
       *pte = 0;
+    }
+    else if((*pte & PTE_SWAPPED)) {
+        blockno = (*pte)>>12;
+        balloc_free(  blockno);
     }
   }
   return newsz;
@@ -310,39 +314,8 @@ clearpteu(pde_t *pgdir, char *uva)
   *pte &= ~PTE_U;
 }
 
-// Given a parent process's page table, create a copy
-// of it for a child.
-pde_t*
-copyuvm(pde_t *pgdir, uint sz)
-{
-  pde_t *d;
-  pte_t *pte;
-  uint pa, i, flags;
-  char *mem;
 
-  if((d = setupkvm()) == 0)
-    return 0;
-  for(i = PGSIZE; i < sz; i += PGSIZE){
-    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
-      panic("copyuvm: pte should exist");
-    if(!(*pte & PTE_P))
-      panic("copyuvm: page not present");
-    pa = PTE_ADDR(*pte);
-    flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto bad;
-    memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
-      kfree(mem);
-      goto bad;
-    }
-  }
-  return d;
 
-bad:
-  freevm(d);
-  return 0;
-}
 
 //PAGEBREAK!
 // Map user virtual address to kernel address.
@@ -386,6 +359,198 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 }
 
 //PAGEBREAK!
+
+
+void 
+swap_page_from_pte(pde_t *pgdir, pte_t *pte) 
+{
+  uint b, pa, address;
+  char temp[PGSIZE] = "";
+  cprintf("entered into swappagefrompte");
+  pa = PTE_ADDR(*pte);
+  address = pa;
+  b = balloc_page();
+
+  //copy data from page given by pte to temp.
+  memmove(temp, (char*)P2V(pa), PGSIZE);
+  cprintf("data copied:  %d", b);
+  write_page_to_disk(temp, b);
+  cprintf("page written to disk");
+  b = b << 12;
+	*pte = b | PTE_FLAGS(*pte);
+  *pte &= ~PTE_P;
+  *pte |= PTE_SWAPPED;
+  cprintf("pte val : %d", *pte);
+  cprintf("done setting up flags");
+  //invalidate tlb entry for pa, so need to reload tlb
+  lcr3(V2P(pgdir));
+  cprintf("changed pgdir");
+  kfree(P2V(address));
+  cprintf("freed the page which is swapped");
+  
+}
+
+//FIFO replacement algorithm
+
+pte_t*
+select_victim(pde_t *pgdir) 
+{
+  pte_t *pte;
+  int i, j;
+  for(i = PGSIZE; i <= KERNBASE; i += PGSIZE) {
+    if((pte = walkpgdir(pgdir, (char*)i, 0)) != 0){
+			if(*pte==0 || *pte & ~PTE_P)
+				return (pte_t*)(pte);
+			if(*pte & PTE_P && *pte & ~PTE_ACCESS)
+				return (pte_t*)(pte); 
+      else if(*pte & PTE_P)
+        j = i;
+		}
+	}
+  return (pte_t*)walkpgdir(pgdir, (char*)j, 0);
+}
+
+void 
+unset_all_swapped(pde_t *pgdir) 
+{
+  uint i;
+  pte_t *pte;
+  for(i = PGSIZE; i <= KERNBASE; i += PGSIZE) {
+      pte = walkpgdir(pgdir, (char*)i, 0);
+      if(*pte != 0 && *pte & PTE_P && *pte & PTE_ACCESS)
+        *pte &= ~PTE_ACCESS;
+	}
+}
+
+void 
+swap(pde_t *pgdir) 
+{
+  pte_t *pte;
+  cprintf("entered into swap");
+  pte = select_victim(pgdir);
+  cprintf("victim selected : %d", *pte);
+  if(*pte & PTE_ACCESS) {
+    unset_all_swapped(pgdir);
+  }
+  *pte |= PTE_ACCESS;
+  swap_page_from_pte(pgdir, pte);
+}
+
+int 
+getswappedblk(pde_t *pgdir, uint a)
+{
+  pte_t *pte;
+  cprintf("Entering into get swapped blockno");
+  pte = walkpgdir(pgdir, (char*)a, 0);
+  cprintf("pte : %d", *pte);
+  cprintf("block no : %d", *pte >> 12 );
+
+	//if(*pte & PTE_SWAPPED) {
+    //cprintf("has to be true");
+		return ((*pte) >> 12);
+  /*}
+	else
+		return -1;*/
+
+}
+
+void 
+map_address(pde_t *pgdir, uint addr) 
+{
+  uint a;
+  pte_t *pte;
+  char *page;
+  int blockno = -1;
+  cprintf("Entered into map address");
+	a = PGROUNDDOWN(addr);		
+  pte = walkpgdir(pgdir, (char*)a, 1);
+  cprintf("Done with walkpgdir");
+  
+  page = kalloc();
+  cprintf("first attempt with kalloc");
+ 
+  if(!page){
+    cprintf("not allocated using kalloc, swap");
+    swap(pgdir);
+    page = kalloc(); 
+    memset(page, 0, PGSIZE);
+    //mappages(pgdir, (char*)a, PGSIZE, V2P(page), PTE_P | PTE_W | PTE_U );
+    //lcr3(V2P(pgdir)); 
+	}
+  cprintf("Done with kalloc");
+ // cprintf("idk what to do");
+  if(!(*pte & PTE_P) && (*pte & PTE_SWAPPED)){
+    cprintf("error in if");
+    cprintf("page is already swapped, bring it back");
+    blockno = getswappedblk(pgdir,a); 
+    cprintf("block no : %d", blockno);     
+    read_page_from_disk(page, blockno);
+    cprintf("done reading");
+    *pte = V2P(page) | PTE_FLAGS(*pte);
+    *pte &= ~PTE_SWAPPED;
+    *pte |= PTE_P;
+    balloc_free(blockno);
+    lcr3(V2P(pgdir));
+  }
+  else {
+  
+    cprintf("error in else");
+    memset(page, 0, PGSIZE);  
+    cprintf("page val : %d", page);
+    cprintf("pte val : %d", pte);
+    *pte = V2P(page) | PTE_P | PTE_W | PTE_U ;
+    lcr3(V2P(pgdir)); 
+  }
+  //cprintf("pte val : %d", pte);
+  cprintf("returning from map address");
+}
+
+
+void
+pgfault_handler(void)
+{
+	uint addr;
+	struct proc *curr = myproc();
+	addr = rcr2();
+	addr = PTE_ADDR(addr);
+  cprintf("Encountered pg fault");
+	map_address(curr->pgdir, addr);
+}
+
+
+// Given a parent process's page table, create a copy
+// of it for a child.
+pde_t*
+copyuvm(pde_t *pgdir, uint sz)
+{
+  pde_t *d;
+  pte_t *pte;
+  uint pa, i, flags;
+  char *mem;
+
+  if((d = setupkvm()) == 0)
+    return 0;
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
+      panic("copyuvm: pte should exist");
+    
+    pa = PTE_ADDR(*pte);
+    flags = PTE_FLAGS(*pte);
+    if((mem = kalloc()) == 0)
+      goto bad;
+    memmove(mem, (char*)P2V(pa), PGSIZE);
+    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
+      kfree(mem);
+      goto bad;
+    }
+  }
+  return d;
+
+bad:
+  freevm(d);
+  return 0;
+}
+
 // Blank page.
 //PAGEBREAK!
 // Blank page.

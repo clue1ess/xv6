@@ -16,6 +16,7 @@
 #include "file.h"
 #include "fcntl.h"
 
+extern int numallocblocks;
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -440,5 +441,28 @@ sys_pipe(void)
   }
   fd[0] = fd0;
   fd[1] = fd1;
+  return 0;
+}
+
+int
+sys_bstat(void)
+{
+	return numallocblocks;
+}
+
+int
+sys_swap(void)
+{
+  uint addr;
+
+  if(argint(0, (int*)&addr) < 0)
+    return -1;
+  struct proc *curr = myproc();
+  pde_t *pgdir = curr->pgdir;
+  //pte_t *pte = walkpgdir(pgdir, (char*)addr, 1);
+  //if(*pte & PTE_P){
+    swap(pgdir);
+  //}
+
   return 0;
 }

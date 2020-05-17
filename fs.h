@@ -55,3 +55,4 @@ struct dirent {
   char name[DIRSIZ];
 };
 
+//int numallocblocks; 

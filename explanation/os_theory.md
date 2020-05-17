@@ -74,7 +74,7 @@ Multi-tasking : Multi-programming + time-sharing.
 
 ## Priviledge instruction
 
-For single task OS environment, ony one program is loaded into memory. But for multitasking OS environment, multiple programs is loaded into memory simultaneously but only one is executed at a time(which one is to be executed depends on scheduler).For a partricular time slice, one  program is executed and suspended after some time(if it is not completed) and whole context of that process is saved and some other process is scheduled.
+For single task OS environment, ony one program is loaded into memory. But for multitasking OS environment, multiple programs is loaded into memory simultaneously but only one is executed at a time(which one is to be executed depends on scheduler).For a particular time slice, one  program is executed and suspended after some time(if it is not completed) and whole context of that process is saved and some other process is scheduled.
 Each program has four segments - *code, data. stack, heap*. No program should spoil other program's segments and also that of OS. Hence, CPU has two modes of operation specified by mode bit:
 1. User mode (normal instructions can run in this mode).
 2. Kernel mode (priviledge instructions can also run in this mode.)
@@ -219,7 +219,7 @@ The virtual address space for a process is the set of virtual memory addresses t
    seventh byte -> next 4 bits of limit and some bits(G, Available.., not important for now)
    eighth byte -> upper 8 bits of base
 
-   CS(code segment), DS(data), ES(extra), SS(stack) are known as selector because this segmnets selects appropriate descriptor in gdt and that descriptor give base(starting address) and limit(max size) of that segment. 
+   CS(code segment), DS(data), ES(extra), SS(stack) are known as selector because this segmnets selects appropriate descriptor in gdt and that descriptor give base(starting address) and limit(max size) of that segment. Selector is of 16 bits in which 13 bits represent index in GDT/LDT from which it is supposed to select descriptor, next 1 bit represent whether it is GDT/LDT, next 2 bits represent CPL(current privilegde level) of the program executing.
 
    Let's go through an example:
 
@@ -248,3 +248,19 @@ will contain base address of page table)                            give particu
 ## TSS
  
 Current process's environment has to saved. So, for that system has provision for TSS(Task State Segment). Such space is made available for every task. When task is suspended, its contents are saved in TSS, then trying to refer new TSS wrt new task. TSS contains CS, DS, ES, SS and much more.
+
+## Handling Traps
+
+1. Change user mode to kernel mode on:
+   1. System call
+   2. Hardware interrupt
+   3. Exception/Trap when user program has done some illegal work i.e software interrupts.
+
+2. Actions needed to be taken :
+   1. Change to kernel mode.
+   2. Switch to kernel stack.
+   3. Saving user's registors(Trapframe, will see this in explanation_xv6.md).
+   4. Saving kernel's registors(Context, will see this in explanation_xv6.md).
+   5. Start kernel in appropriate place i.e. invoke appropriate handler for a particular trap no. 
+
+PL changes automatically on `int` instruction and changes back using `iret`. There is table idt (interrupt descriptor table) which has list of interrupt descriptors.`int n` invokes nth trap handler(i.e. nth interrupt descriptor) in IDT. xv6 uses `int 64` for system calls.

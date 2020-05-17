@@ -2,7 +2,7 @@
 
 **Reference :** MIT6_828F12_xv6-book-rev7.pdf
 
-## Section 1
+## Section 1 - Loading the Kernel
 
 BIOS loads first sector(512 bytes)(known as bootloader) into a predefined location (0x7c00 for xv6) and jumps to it. It is responsibility of bootloader to find where is rest of kernel in the device and load it into memory and give control to it(jump to first instruction).
 If the system has multiple processors, first processor boots up and initializes other processors.
@@ -13,7 +13,7 @@ When system boots, it always starts in 16-bit real mode.
 start:
 
 1. Disable all interrupts
-    When interrupt occurs i.e. knocking on INTR pin of processor, it will switch the execution to handler if interrupt bit in flag registor is set to 1. What we want is no disturbance until we set kernel and interrupt handlers, though BIOS has setup its own handlers, we want reinitialize the system completely. So, cli instruction will set interrupt bit to 0 in flag registor. 
+    When interrupt occurs i.e. knocking on INTR pin of processor, it will switch the execution to handler if interrupt bit in flag registor is set to 1. What we want is no disturbance until we set kernel and interrupt handlers, as BIOS has setup its own handlers, it is no longer appropriate or safe to handle interrupts from hardware devices. We want to reinitialize the system completely. So, cli instruction will set interrupt bit to 0 in flag registor. 
 2. Load all segments and set them to 0.
     Initially, we want flat address space. So, va = pa.
     Why?
@@ -38,12 +38,10 @@ start:
             SEG_ASM(STA_W, 0x0, 0xffffffff)
             has base = 0 and limit = 0xffffffff permissions = write(STA_W)
 
-        Q%%. why code and data has same mapping 0 to limit?
-
 
 4. Enter protected mode.
     set protected enabled bit in control registor #0 (CR0)
-    Note: There are control registore required by processor CR0 - CR4. Each CR has different and special meaning to each bit.
+    Note: There are control registore required by processor CR0 - CR4. Each bit in CR has different and special meaning.
 5. Enter 32 bit mode using ljmp to start32 as cs caanot be modified directly.
     selector has 13 bit index, 1 bit whether it is LDT or GDT(leave it), 2 bits for priviledge level.
     ljmp cs:ip 
@@ -85,7 +83,7 @@ Implementation:
 2. read first page of the disk(which is elf header) using readseg.
     void readseg(uchar* pa, uint count, uint offset)
     2.1 sector size = 512. Find no of sectors required
-    2.2 set page boundary pa -= offset % SECTSIZE //??
+    2.2 set page boundary pa -= offset % SECTSIZE 
     2.3 offset = (offset / SECTSIZE) + 1; //elf sectors start at 1, sector 0 is bootloader
     2.4 loop to required no, read that sector into memory given by pa using readsect(not required how it works.)
 3. Check for magic number in elf header to verify it is not corrupted.
@@ -96,7 +94,7 @@ Implementation:
     5.3 optimization, ph has two diff field memsz and filesz. So, if(memsz > filsz), set rest to 0. Meaning, disk has filesz of program available, so while loading into memory which is of memsz, set memsz-filesz = 0.
 6. get starting point of execution of kernel using elf->entry and cast to function pointer and switch to it.
 
-Note: Kernel generally loads at 0x100000 (pa) because first 1MB is reserved for memory mapped devices, like console, etc.
+Note: Kernel generally loads at 0x100000 (pa) because first 1MB is reserved for memory mapped devices.
 
 Q. What are memory mapped devices? 
 -->Memory mapped I/O is a way to exchange data and instructions between a CPU and peripheral devices attached to it. Memory mapped IO is one where the processor and the IO device share the same memory location(memory),i.e.,the processor and IO devices are mapped using the memory address.
@@ -120,22 +118,24 @@ entry:
     };
     va space:
     ...
-    2GB + 4MB  --> second entry in entrypgdir which will map to 0-4MB in pa space
+    2GB + 4MB  --> second entry in entrypgdir which will map to 0-4MB in pa space(at index = 512 in entrypgdir)
     2GB
     ...
-    4MB        --> first entry in entrypgdir which will map to 0-4MB in pa space
+    4MB        --> first entry in entrypgdir which will map to 0-4MB in pa space(at index = 0 in entrypgdir)
     0
 
     KERNBASE = 0x80000000 and PDXSHIFT = 22 bits(largs page size is 4MB i.e 22 bits)
     Kernel will run above 2GB(KERNBASE) in va always and user will run from 0 to 2GB. As soon as, we setup kernel address space, kernel will shift to it and remove 0-4MB mapping in va space. This mapping was needed only to setup kernel at KERNBASE.
 
-3. Turn on paging by loading somthing in cr0(not imp what it is for now).
+3. Turn on paging by seeting PG(page enabled) bit in cr0(also WP bit, not imp what it is for now).
 4. Set up stack pointer in va space.
     movl $(stack + KSTACKSIZE), %esp 
     stack is variable declared by kernel which has address above KERNBASE. esp = KERNBASE + somthing + KSTACKSIZE and will grow downwards.
-5. jump to main which has va, so to shift from different address spaces, pc relative jump don't work(why?). Hence indirect jump to main.
+5. jump to main which has va, so to shift from different address spaces, pc relative jump don't work. Hence indirect jump to main.
 
 Now, esp and eip both will point above KERNBASE.
+
+## Section 2 - Setting up Kernel page directory!
 
 main:
 
@@ -155,6 +155,7 @@ Now we need to remove mapping of 0-4MB in va and also map rest of KERNBASE + 4MB
     |   Memory mapped devices(1MB)
     KERNBASE
     ...
+This is to be done!
 
 kvmalloc :
     area required for kernel pgdir is taken from kernel heap.
@@ -162,10 +163,10 @@ kvmalloc :
     1.2 switch to kernel pgdir using switchkvm.
 
 Q. what happens to entrypgdir?
-->it is static array allocated, so can't be deallocted while kpgdir is allocated through kernel heap and hence can be deallocated.
+-> It is static array allocated, so can't be deallocted while kpgdir is allocated through kernel heap and hence can be deallocated.
  
 setupkvm:
-    set up kernel page table. Setupkvm returns pointer to kpgdir which is in va.
+    set up kernel page table which is used by scheduler process. Setupkvm returns pointer to kpgdir which is in va.
 1. allocate a page using kalloc(still in kERNBASE-KERNBASE+4MB va space)
 2. clear the page(no mappings)
 3. kmap :
@@ -220,10 +221,98 @@ NOTE: pde and pte conatin physical adresses.
 5. Return address of pte.
 
 switchkvm :
-    load cr3 with kernel pgdir(convert va->pa using v2p, remember setupkvm returns pointer in va space)
+    load cr3 with kernel pgdir(convert va->pa using v2p, remember setupkvm returns pointer in va space i.e. kpgdir)
+
+## Section 3 - Trap handling
+
+There is table idt (interrupt descriptor table) which has list of interrupt descriptors for interrupt no(256 entries in total).Each entry consists of %cs and %ip to be used while handling that trap. Interrupts 0-31 are defined as software interrupts like divide by 0, floating point exception, page fault, etc. 32-63 are used for hardware interrupts and 64 is used for system call.  tvinit from main sets up all these entries but doesn't enable it.
+
+**Note** : Each processor has to enable interrupt handlers which will be done in startothers() and mpmain() which will see later.
+
+// Gate descriptors for interrupts and traps  
+struct gatedesc {
+uint off_15_0 : 16; // low 16 bits of offset in segment
+uint cs : 16;       // code segment selector
+uint args : 5;      // # args, 0 for interrupt/trap gates
+uint rsv1 : 3;      // reserved(should be zero I guess)
+uint type : 4;      // type(STS_{IG32,TG32})
+uint s : 1;         // must be 0 (system)
+uint dpl : 2;       // descriptor(meaning new) privilege level
+uint p : 1;         // Present 
+uint off_31_16 : 16;// high bits of offset in segment
+};
+
+SETGATE(gate, istrap, sel, off, d) : 
+    gate = a particular interrupt descriptor of type gatedesc
+    istrap = 1:trap 0:interrupt
+    sel: Code segment selector for interrupt/trap handler (SEG_KCODE << 3)
+    off: Offset in code segment for interrupt/trap handler(vector in vector table which is set in perl script)
+    dpl: Descriptor Privilege Level −
+        the privilege level required for software to invoke
+        this interrupt/trap gate explicitly using an int instruction
+
+tvinit:
+
+1. iterate over 256 entries
+    1.1 set interrupt descriptor using SETGATE and dpl = 0(kernel mode)
+2. set dpl for syscall interrupt(64) = 1(user mode) so that user code can use syscall using int 64(T_SYSCALL). See note below.
+
+**Note**: xv6 doesn’t allow processes to raise other interrupts (e.g., device interrupts) with int; if they try, they will encounter a general protection exception, which goes to vector 13.
+
+Q. Diff bet trap and interrupt ?
+-> Trap occurs when running process make syscall, otherwise for exception or by other devices, interrupt is genetrated. 
+
+When trap/interrupt occurs, if processor is in user mode, it needs to change from user mode to kernel mode(using switchuvm). Also, while switching, registors should be saved on kernel stack not on user stack.
+
+When a trap occurs, the processor hardware does the following. If the processor was executing in user mode, it loads %esp and %ss from the task segment descriptor, pushes the old user %ss and %esp onto the new stack. If the processor was executing in kernel mode, none of the above happens. The processor then pushes the %eflags, %cs, and %eip registers. For some traps, the processor also pushes an error word.
+The processor then loads %eip and %cs from the relevant IDT entry. xv6 uses a Perl script to generate the entry points(vectors) that the IDT entries point to. Each entry pushes an error code if the processor didn’t, pushes the interrupt num­ber, and then jumps to alltraps.
+
+alltraps :
+
+1. build trapframe (meaning push ds, es, fs, gs registors into kstack) i.e. general purpose registors.
+2. set up data segments for kernel 
+3. push kernel stack pointer
+4. call the trap.
+
+trap:
+
+1. Find the trap no in tf->eax.
+2. If it is trap no 64 i.e T_SYSCALL, 
+    2.1 Check if the processor is killed or not.
+    2.2 call syscall.
+3. Else find the appropriate handler for trap occured and do the appropritae action.
+
+Q. who sets trapno in trapframe?
+-> Trapframe is present in proc structure available for each process. when we push the arguments onto stack, they are pushed in such a way that it matches the stryucture of trapframe.(still, i am not sure!)
+
+trapret :
+    
+1. Pops offs other user's registors that are not poped by hardware(which are ss, sp, flag, cs, ip) and errocode if any.
+2. iret so that hardware can pops off remaining registors and change back to user mode.
+
+Q. What happens when you execute `int n` instruction?
+->
+1. Fetch nth descriptor from idt. 
+2. Priviledge level check! (check if DPL(pl of descriptor) >= CPL(current pl, rememeber high pl has low numerical value)
+3. Check for selectors's pl(which is selected by GATE descriptor) < CPL, if it so, that means process is running in user mode so need to save %esp and %ss registors.
+4. Load %ss and %sp for kernel stack from TSS(remember, each process has it's own TSS which is used at time of context switching and mode switching).
+ TSS descripto to be selected from GDT and index is given by TR registor(done by switchuvm, will see this in detail later).
+5. Push %ss, and %esp and load from TSS(this is optional, done only if process is running in user mode.), push %eflag, %cs, %eip. NOw, while handling interrupt, we don't want another interrutp so clear IF(Interrupt flag) bit in %eflag. Also, load %cs(selector) and %ip(offset) using gate descriptor fetched in step 1.
+6.%cs:%ip will point to particular entry of vector for example if n = 64:
+vector64:
+    pushl $0
+    pushl $64
+    jmp alltraps
+
+It will push 0(or errorcode if any), then trapno i.e 64 in this case, onto the stack. Now it will jump to alltraps.
+6. Now, esp is pointing to trap no in kernel stack and we need to pass this trap no as argument to trap function which handle all traps. So, passing arguments through stack. For this, push esp, call trap. After trap returns, pop the pushed esp and you are back to same kernel stack as before. 
+7. when returns from trap, it first pops esp pushed, then call trapret.
+8. We have stack having contents like this:
+ss, esp,eflags, cs, eip, 0 (for error code), 64, ds, es, fs, gs, eax, ecx, edx, ebx, oesp, ebp, esi, edi, esp
+So, first pop all pops all general purpose registors from esp to eax, Then pops gs, fs, es and ds. Then pops trap no and errorcode (which is 0 in this case). Then, it calls iret which pops off all remaining user registors and changes mode back to user mode.
 
 
-## Section 2
+## Section 4 - Creating the first process
 
 // Per−process state
 struct proc {
@@ -244,6 +333,8 @@ char name[16];              //Process name (debugging)
 
 Q. what is kernel and user stack?
 -> Each process has two stacks: a user stack and a kernel stack. When the process is executing user in­structions, only its user stack is in use, and its kernel stack is empty. When the pro­ cess enters the kernel (via a system call or interrupt), the kernel code executes on the process’s kernel stack; while a process is in the kernel, its user stack still contains saved data, but isn’t actively used. A process’s thread alternates between actively using the user stack and the kernel stack. The kernel stack is separate (and protected from user code) so that the kernel can execute even if a process has wrecked its user stack.
+There is thirs stack which is used by scheduler processes.(we have seen this, in kvmalloc())
+
 
 Q. What is trapframe?
 -> Whenever control transfers into the kernel while a process is running, the hardware and xv6 trap entry code save user registers on the process’s kernel stack. OS writes values at the top of the new stack that look just like those that would be there if the process had entered the kernel via an interrupt, so that the or­ dinary code for returning from the kernel back to the process’s user code will work.
@@ -261,14 +352,23 @@ Q. If there is context, what is the need for TSS?
 2. Trapframe is not valid when process is running in user mode as contents of trapframe are going to change.
 3. Suppose two processes are running, above KERNBASE, two diff kstacks and two disjoint set of pages(given by respective pgdir).
 
-**Creating the first process** :
+
+### Creating the first process :
+
+Code of the first process:
+initcode.S and init.c
+init.c is compiled into “/init” file During make !
+xv6 approach:
+Use initcode.S to “exec(“/init”)” and let exec() do rest of the job
+
+Normally, processes fork another process and then exec but we don't have a parent process, we need to build process by hand as if it was created by fork.
 
 1. We need PCB for running any process. So, need to allocate one. Allocproc() does this. It checks UNUSED entry in proc table and if found, 
 changed the state to EMBRYO (meaning only PCB is allocated and kernel satck and page directory is not allocated).
 2. Allocate kernel stack for this process and if everything goes fine, change the state to UNUSED.
 3. Now, we need to setup kernel stack. Kernel stack is setup in following manner. 
 4. First, we setup trapframe which is used to save user's registors. 
-5. Now, iret instructions pops off only 5 registors - cs, ip, ss, sp and flag, rest others also need to pop off, so this is done by traret function. By calling convention, trapret return address is stored after trapframe. 
+5. Now, iret instructions pops off only 5 registors - cs, ip, ss, sp and flag, rest others also need to pop off, so this is done by trapret function. By calling convention, trapret return address is stored after trapframe. 
 6. forkret is the function which returns to trapret meaning address of forkret is stored just after trapret. This is the case for the forked process but xv6 does not consider special case for first process.
 7. Next thing is before doing anything in kernel side, it saves kernel registors in its context.  
 8. In between context and forkret, there can be many chain of function calls.
@@ -286,7 +386,7 @@ changed the state to EMBRYO (meaning only PCB is allocated and kernel satck and 
 
 9. Now, we need to create a page table for the process with (at first) mappings only for memory that the kernel uses. 
 The initial contents of the first process’s memory are the compiled form of init­ code.S.
-10. Once the process is initialize, set the state to RUNNABLE so that scheduler can schedule it fir running.
+10. Once the process is initialize, set the state to RUNNABLE so that scheduler can schedule it for running.
 
 userinit:
 
@@ -297,14 +397,14 @@ userinit:
     1.3 if found, 
         1.3.1 release lock on process table
         1.3.2 mark that entry's state as EMBRYO and pid to nextpid(which is global int set to 1) and increment nextpid
-        1.3.3 allocate kernel stack using kalloc (which allocates one page for kernel stack by checking in free list i.e. kmem and returns    physical adress of that page)
+        1.3.3 allocate kernel stack using kalloc (which allocates one page for kernel stack by checking in free list i.e. kmem and returns physical adress of that page)
         1.3.4 if not enough space
             1.3.3.1 set entry's state as UNUSED and return
         1.3.5 if found
             1.3.5.1 set the sp pointer to virtual address of kernel stack which is p->kstack + KERNBASE
             1.3.5.2 leave space for trapframe i.e. sp = sp - sizeof(trapframe) and p->tf should point end of trapframe which is sp.
             1.3.5.3 leave space for trapret i.e. sp = sp - 4 and put address of trapret onto stack hence sp = sp + 4
-            1.3.5.4 leave space for context i.e sp = sp - sizeof(context) and p->context = shou;d point to end of context which is sp.
+            1.3.5.4 leave space for context i.e sp = sp - sizeof(context) and p->context should point to end of context which is sp.
             1.3.5.5 set memory locations by p->context to 0.
             1.3.5.6 set p->context->eip to forkret
 
@@ -332,7 +432,7 @@ userinit:
 
         3.1 allocate a page using kalloc
         3.2 clear the page 
-        3.3 mappages create PTEs for virtual addresses starting at va that refer to physical addresses starting at pa. (will come to it later)
+        3.3 mappages create PTEs for virtual addresses starting at va that refer to physical addresses starting at pa. 
         3.4 move binary code to allocated page in 3.1 using memmove.
 
 4. now we need to set user segment registors in trapframe in kstack(1.3.5.2)
@@ -357,7 +457,7 @@ now next thing is to call scheduler and start executing init.
 mpmain calls scheduler.
 
 mpmain:
-1. calls idtinit which calls lidt to load ist registor
+1. calls idtinit which calls lidt to load idt
 2. calls xchg
 
 // Per−CPU state
@@ -368,7 +468,7 @@ struct cpu {
     struct segdesc gdt[NSEGS];      //x86 global descriptor table
     volatile uint started;          //Has the CPU started?
     int ncli;                       //Depth of pushcli nesting.
-    int intena;                     //Were interrupts enabled before pushcli?
+    int intena;                     //Were interrupts enabled before pushcli
     struct cpu *cpu;                // Cpu−local storage variables; see below
     struct proc *proc;              // The currently−running process.
 }
@@ -377,49 +477,9 @@ so maybe xchg will say that particular cpu has been started and will make common
 
 3. calls scheduler
 
-scheduler:
+Please refers to scheduler section below.
 
-Scheduler is kernel thread and has its own stack but doesn't have a pgdir associated with it, so it is not a process. Every xv6 process has its own kernel stack and register set. Each CPU has a separate scheduler thread for use when it is executing the sched­ uler rather than any process’s kernel thread. Switching from one thread to another in­volves saving the old thread’s CPU registers, and restoring previously­ saved registers of the new thread; the fact that %esp and %eip are saved and restored means that the CPU will switch stacks and switch what code it is executing.
-
-// Per−CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns. It loops, doing:
-// − choose a process to run
-// − swtch to start running that process
-// − eventually that process transfers control
-// via swtch back to the scheduler
-
-1. At first, we have disabled all the interrupts. So, we will enable them using sti.
-2. acquire lock on process table and loop over all available processes to find out which one is runnable.
-3. switch to the process if found. Release of lock should be done by process and reacquire them before coming back to scheduler.
-    if not found , release lock on ptable and return.   
-    now only initproc is available, so it will switch to it. set per-cpu variable for process(proc) to found process
-4. switchuvm will tell hardware to set up target process's table and switch TSS.
-    4.1 pushcli - pops eflag and cli
-    4.2 set up TSS(task segment state) to save all kernel registors and kstack and co-processor's data if available.
-    4.3 cpu->gdt[].s - There are two types of descriptor system and segment which is denoted by s bit in ARB(remember Access Right Bytes in descriptor) of descriptor. So, TSS requires system descriptor. 
-    4.4 set SEG_KDATA and SEG_KSTACK(va) in TSS
-    4.5 ltr - load task register
-    4.6 lcr3 switch address space. address spce of current process meanimg its pgdir is in p->pgdir which is va. so, need to convert va -> pa by subtracting KERNBASE.
-    4.7 popcli - pos eflag and sti
-5. set process's state to running
-6. swtch -> saves old context and loads new context. so old = cpu->scheduler(scheduler's context) and new = proc->context.(will see this later.)
-7. switchkvm -> switch to kernel page table after process is done. 
-8. when process is done, it should set appropriate state itself  and come back to scheduler
-    scheduler set proc variable to 0
-    loops again.
-
-Switching context while scheduling:
-
-void swtch(struct context **old, struct context *new);
-//Save current register context in old
-//and then load register context from new.
-
-Swtch starts by loading its arguments off the stack into the registers %eax and %edx; swtch must do this before it changes the stack pointer and can no longer access the arguments via %esp. Then swtch pushes the register state, creating a context structure on the current stack. Only the callee­ save registers need to be saved; the convention on the x86 is that these are %ebp, %ebx, %esi, %ebp, and %esp.
-
-Swtch pushes the first four explicitly ; it saves the last implicitly as the struct context* written to *old. There is one more important register: the program counter %eip was saved by the call instruction that invoked swtch and is on the stack just above %ebp. Having saved the old context, swtch is ready to restore the new one. It moves the pointer to the new context into the stack pointer (2720) . The new stack has the same form as the old one that swtch just left—the new stack was the old one in a previous call to swtch—so swtch can invert the sequence to re­store the new context. It pops the values for %edi, %esi, %ebx, and %ebp and then returns. Because swtch has changed the stack pointer, the values restored and the instruction address returned to are the ones from the new context.
-
-**How system call works?**
+### How system call works?
 
 1. Push the arguments required by the syscall and then push return address of the function.
 2. Put system call no which you want into eax registor.
@@ -451,7 +511,7 @@ initcode.S :
 After exec, user-level init will get executed.
 init:
 
-1. opens device file named as "console".(need to think?)
+1. opens device file named as "console".
 2. calls forks
 3. child process calls exec with arguments "sh" i.e. shell program.
 4. waits for child to terminate
@@ -468,19 +528,20 @@ shell:
     4.4 wait for child to complete
     4.5 continue
 
-## Section 3
-
+## Section 5 - Fork and Exec
 
 fork:
 
+sys_fork()->fork();
+
 fork the process meaning create a copy of process
-1. allocate the process and allocate kstack using allocproc
-2. copy process same as parent process uding copyuvm.
+1. get the current proc using myproc() and then allocate the process and allocate kstack using allocproc
+2. copy process same as parent process using copyuvm.
 3. if allocation fails in step 2, free ksatck and make state of allocated process in process table as UNUSED.
 4. set proc->sz, proc->tf same as parent.
 5. set proc->parent = parent's process proc
 6. set eax reg(return value) to 0 in child's tf
-7. now copy open files table(idt should expore this, not needed for now)
+7. now copy open files table
 8. set proc->state = RUNNABLE if everything went fine.
 9. safestrcpy copies name of program.
 10. fork should return pid of child in parent, so proc->pid should be returned.
@@ -489,7 +550,7 @@ fork the process meaning create a copy of process
 copyuvm :
 
 create a copy of parent's process table pages
-1. cretae kernel mapping of virtual address space using setupkvm.
+1. create kernel mapping of virtual address space using setupkvm.
 2. for total parent process's memory using proc->sz, iterate from 0 to proc->sz, pagewise
     2.1 find pte corresponding to that page using walkpgir on parent's pgdir
     2.2 find pa for that pte using macro PTE_ADDR
@@ -503,8 +564,8 @@ exec :
 replace the process's memory with given program's image.
 1. acquire lock on the inode given bt path using ilock and read the inode from disk.
 2. as file is executable, it must be in elf format. So, to ensure file is not corrupted, check for elf->magic_number.
-3. create kernel mapping of virtual address space using setupkvm.(why? already there? may be will deallocate the allocated at timeof fork)
-4. load the program into memory. Now, as we know, executable has program headers which has rto be loaded into memory. Iterate till ph.num
+3. create kernel mapping of virtual address space using setupkvm.   
+4. load the program into memory. Now, as we know, executable has program headers which has to be loaded into memory. Iterate till ph.num
     4.1 read program segment at ph.off
     4.2 allocate pages amd map them for this program to be loaded using allocuvm
     4.3 load the program segment into pages allocated above using loaduvm.
@@ -625,54 +686,301 @@ deallocate all user pages from KERNBASE to 0.
     2.3 free that page using kfree
     2.4 set that pte to 0.
 
-## Section 4
+## Section 6 - Scheduler
 
-Trap handling:
+scheduler:
 
-There is table idt (interrupt descriptor table) which has list of interrupt descriptors for interrupt no(256 entries in total). tvinit from main(which calls kinit1, userinit, etc.) sets up all these entries.
+Scheduler is kernel thread and has its own stack but doesn't have a pgdir associated with it, so it is not a process. Every xv6 process has its own kernel stack and register set. Each CPU has a separate scheduler thread for use when it is executing the sched­uler rather than any process’s kernel thread. Switching from one thread to another in­volves saving the old thread’s CPU registers, and restoring previously­ saved registers of the new thread; the fact that %esp and %eip are saved and restored means that the CPU will switch stacks and switch what code it is executing.
 
-tvinit:
+// Per−CPU process scheduler.
+// Each CPU calls scheduler() after setting itself up.
+// Scheduler never returns. It loops, doing:
+// − choose a process to run
+// − swtch to start running that process
+// − eventually that process transfers control
+// via swtch back to the scheduler
 
-1. iterate over 256 entries
-    1.1 set interrupt descriptor using SETGATE and dpl = 0(kernel mode)
-2. set dpl for syscall interrupt(64) = 1(user mode) so that user code can use syscall using int 64(T_SYSCALL). See note below.
+1. At first, we have disabled all the interrupts. So, we will enable them using sti.
+2. acquire lock on process table and loop over all available processes to find out which one is runnable.
+3. switch to the process if found. Release of lock should be done by process and reacquire them before coming back to scheduler.
+    if not found , release lock on ptable and return.   
+    now only initproc is available, so it will switch to it. set per-cpu variable for process(proc) to found process
+4. switchuvm will tell hardware to set up target process's table and switch TSS.
+    4.1 pushcli - pops eflag and cli
+    4.2 set up TSS(task segment state) to save all kernel registors and kstack and co-processor's data if available.
+    4.3 cpu->gdt[].s - There are two types of descriptor system and segment which is denoted by s bit in ARB(remember Access Right Bytes in descriptor) of descriptor. So, TSS requires system descriptor. 
+    4.4 set SEG_KDATA and SEG_KSTACK(va) in TSS
+    4.5 ltr - load task register
+    4.6 lcr3 switch address space because we are still in kpgdir created in entry.S. address space of current process meanimg its pgdir is in p->pgdir which is allocated in setupkvm in userinit, which is va. so, need to convert va -> pa by subtracting KERNBASE.
+    4.7 popcli - pos eflag and sti
+5. set process's state to running
+6. swtch -> saves old context and loads new context. so old = cpu->scheduler(scheduler's context) and new = proc->context.(will see this later.)
+7. switchkvm -> switch to kernel page table after process is done. 
+8. when process is done, it should set appropriate state itself  and come back to scheduler
+    scheduler set proc variable to 0
+    loops again.
 
-NOTE: xv6 doesn’t allow processes to raise other interrupts (e.g., device interrupts) with int; if they try, they will encounter a general protection exception, which goes to vector 13.
+Switching context while scheduling:
 
-SETGATE(gate, istrap, sel, off, d) : 
-    gate = list of interrupt gate descriptors
-    istrap = 1:trap 0:interrupt
-    sel: Code segment selector for interrupt/trap handler (SEG_KCODE << 3)
-    off: Offset in code segment for interrupt/trap handler
-    dpl: Descriptor Privilege Level −
-        the privilege level required for software to invoke
-        this interrupt/trap gate explicitly using an int instruction
+Before calling this function, new(p->context) and old(&c->scheduler) are push onto the stack i.e arguments and then ret value of address of scheduler() as per calling conventions.
+void swtch(struct context **old, struct context *new);
+//Save current register context in old
+//and then load register context from new.
 
-Diff bet trap and interrupt ?
-    trap occurs when running process make syscall, otherwise for exception or by other devices, interrupt is genetrated. 
+Swtch starts by loading its arguments off the stack into the registers %edx(p->context) and %eax(c->scheduler); swtch must do this before it changes the stack pointer and can no longer access the arguments via %esp. Then swtch pushes the register state, creating a context structure on the current stack. Only the callee­ save registers need to be saved; the convention on the x86 is that these are %ebp, %ebx, %esi, %ebp, and %esp.
 
-When trap/interrupt occurs, if processor is in user mode, it needs to change from user mode to kernel mode(using switchuvm). Also, while switching, registors should be saved on kernel stack not on user stack.
+Now it makes old to point to esp and esp to point to new. Meaning, the stack on which we are since creation is now stored in c->scheduler pointer and current esp is pointing to new one meaning p->context(remember the stack structure of p->kstack). Then, we pop off all the registors and then ret, our stack contains eip which is pointing to forkret, so now we are in forkret now. Remeber, we taked about process has to release the lock on ptable which is done by forkret. Also, if it is the first process, then some initilization which will see later. Now, forkret return to trapret, trap ret pops off all general purpose registors and call iret. Now, cs and ip are pointing to initcode.S executable and pgdir and stack is setup.
 
-When a trap occurs, the processor hardware does the following. If the processor was executing in user mode, it loads %esp and %ss from the task segment descriptor, pushes the old user %ss and %esp onto the new stack. If the processor was executing
-in kernel mode, none of the above happens. The processor then pushes the %eflags, %cs, and %eip registers. For some traps, the processor also pushes an error word.
-The processor then loads %eip and %cs from the relevant IDT entry. xv6 uses a Perl script to generate the entry points that the IDT entries point to. Each entry pushes an error code if the processor didn’t, pushes the interrupt num­ber, and then jumps to alltraps.
+sched :
 
-alltraps :
+    called from exit(), yield(), sleep() 
+    1. get the current proc structure using myproc.
+    2. does some error checks
+    3. get interrupt enabled status on current CPU
+    4. calls swtch. So, this saves the context in p->context and switches to scheduler stck from kernel stack.
+    5. after comming back, set the interrupt eanbled status back to previous one.
 
-1. build trapframe (meaning push ds, es, fs, gs registors into kstack)
-2. set up code and data segments for kernel 
-3. push kernel stack pointer
-4. call the trap.
 
-trap:
+Combinig all this :
 
-1. Find the trap no in tf->eax.
-2. If it is trap no 64 i.e T_SYSCALL, 
-    2.1 Check if the processor is killed or not.
-    2.2 call syscall.
-3. Else find the appropriate handler for trap occured and do the appropritae action.
+Consider this example, 
 
-trapret :
-    
-1. Pops offs other user's registors that are not poped by hardware(which are ss, sp, flag, cs, ip   ) and errocode if any.
-2. iret so that hardware can pops off remaining registors.
+1. On a timer interrupt, trap() is called. Stack has changed from user stack to kernel stack.
+2. trap() calls yield() which in turn calls sched(.)
+3. sched() ->  swtch(&p->context, c->scheduler(). This saves the context in p->context and stack changes to scheduler’s kernel stack. 
+4. Switches to location after swtch in scheduler().
+5. Now the loop in scheduler()
+6. calls switchkvm()
+7. Then continues to find next process to run 
+8. then calls swtch(&c->scheduler, p->context) (next process's context)
+9. Stack changes to process kernel stack. 
+10. Process runs the last instruction it was was in i.e. mycpu()->intena = intena; in sched()
+11. Then returns to the one who called sched() i.e. exit/sleep, etc
+12. Finally returns from it’s own *TRAP* handler and returns to process’s user stack and user code.
+
+## Section 7 - File system
+
+The xv6 file system implementation is organized in seven layers :
+
+File descriptor |
+Pathname |
+Directory |
+Inode |
+Logging |
+Buffer cache |
+Disk |
+
+Each block is of 512 bytes in xv6.
+
+Arrangements of blocks :
+Block 0 | Bootloader |
+Block 1 | Superblock(contains metadata about file system) |
+Block 2 | log |
+After log | inodes |
+After inodes | bitmap blocks (to indicate which data blocks are free 0-free;1-in use) |
+Remaining | Data blocks |
+
+### Disk
+
+The code is in ide.c
+idequeue points to the buf now being read/written to the disk. idequeue−>qnext points to the next buf to be processed.
+idelock is the spinlock on idequeue.
+B_VALID: the buffer data has been read from the disk.
+B_DIRTY: the buffer data has been modified and needs to be written back to disk.
+
+Functions : 
+
+1. static int idewait(int checkerr);
+--> Wait for IDE disk to become ready.
+
+2. static void idestart(struct buf *b);
+--> Start the request for b. Caller must hold idelock.
+    2.1 Get sector no.
+    2.2 Issue read/write command to IDE controller. 
+
+3. void ideinit(void);
+--> caled from main(). Initialized IDE controller by writing to certain ports and initialize idelock.
+
+4. void ideintr(void);
+--> Interrupt handler for ide interrupt.
+    4.1 Acquire lock on ide
+    4.2 If idequeue is empty, return. Else get the first buffer to be processed and mve the queue one step.
+    4.3 Read data if needed. Set B_VALID and unset B_DIRTY.
+    4.4 wakeup the process who is waiting for this buffer.
+    4.5 If idequeue is not empty, call idestart().
+    4.6 Release lock.
+
+Wakeup :
+    1. acquire lock on ptable
+    2. call wakeup1()
+    3. Release the lock.
+
+Wakeup1 :
+    look for the process in process table which is sleeping on that channel.
+
+5. void iderw(struct buf *b);
+--> Sync buf with disk. If B_DIRTY is set, write buf to disk, clear B_DIRTY, set B_VALID. Else if B_VALID is not set, read buf from disk, set B_VALID.
+    5.1 Acquire ide lock
+    5.2 Append buff b to idequeue
+    5.3 call idestart on firts buffer in idequeue.
+    5.4 Release lock
+
+### Buffer cache
+
+The code is in bio.c
+
+The buffer cache is a doubly linked list of buf structures holding cached copies of disk block contents. The buffer cache layer consists of bread and bwrite; the former obtains a buf containing a copy of a block which can be read or modified in memory, and the latter writes a modified buffer to the appropriate block on the disk.
+
+Interface:
+* To get a buffer for a particular disk block, call bread.
+* After changing buffer data, call bwrite to write it to disk.
+* When done with the buffer, call brelse.
+* Do not use the buffer after calling brelse.
+* Only one process at a time can use a buffer, so do not keep them longer than necessary.
+
+struct buf {
+  int flags;  // 0 or B_VALID or B_DIRTY
+  uint dev;   // device number
+  uint blockno; // seq block number on device 
+  struct sleeplock lock; // Lock to be held by process using it
+  uint refcnt; // Number ofaccesses to the buf 
+  struct buf *prev; // LRU cache list
+  struct buf *next; // LRU cache list
+  struct buf *qnext; // disk queue 
+  uchar data[BSIZE];  // data 512 bytes 
+};
+
+struct {
+struct spinlock lock;
+struct buf buf[NBUF];
+// Linked list of all buffers, through prev/next.
+// head.next is most recently used.
+struct buf head;
+} bcache;
+
+Functions :
+
+1. void binit(void);
+--> called from main(). It creates linked list of buffers.
+
+2. static struct buf* bget(uint dev, uint blockno);
+--> Look through buffer cache for block on device dev. If not found, allocate a buffer. In either case, return locked buffer.
+    2.1 acquire lock on bcache.
+    2.2 loop over bcache to find if the block is already cached meaning buffer is already present for that block no. As head->next is MRU, we search head->next. If found, increment refernce count.
+    2.3 If not found in 2.2, loop over bcache to find if any block is unused meaning whose reference count is 0 and B_DIRTY bit is not set, allocate the buffer. As head->prev is LRU, we search head->prev.
+    2.4 Returns the looked buffer with no contents.
+
+3. struct buf* bread(uint, uint);
+--> Return a locked buf with the contents of the indicated block.
+    3.1 get the buffer using bget for that block no.
+    3.2 check if the B_VALID bit is set or not.
+    3.3 if yes, issue read command using iderw on that buffer.
+
+4. void brelse(struct buf*);
+--> Release a locked buffer. Move to the head of the MRU list.
+    4.1 Release the lock
+    4.2 Decrease the reference count
+    4.3 if ref_cnt is 0, then move the buffer to front of head of bcache list so while accessing head->prev, it will be the first one.
+
+5. void bwrite(struct buf*);
+--> Write b’s contents to disk. Must be locked.
+    3.1 get the buffer using bget for that block no.
+    3.2 set the B_DIRTY bit
+    3.3 issue write command using iderw on that buffer.  
+
+**Note** : How iderw knows whether to read or write? This is done using B_VALID/B_DIRTY bits. If b_DIRTY is present, issue write command and if B_VALID, issue read command. 
+
+### Logging
+
+The code is in log.c
+Xv6 solves the problem of crashes during file system operations with a simple form of logging. An xv6 system call does not directly write the on-disk file system data structures. Instead, it places a description of all the disk writes it wishes to make in a log on the disk. Once the system call has logged all of its writes, it writes a special commit record to the disk indicating that the log contains a complete operation. At that point the system call copies the writes to the on-disk file system data structures. After those writes have completed, the system call erases the log on disk.
+
+1. A system call calls begin_op() at begining and end_op() at end.
+2. During the code of system call, whenever a buffer is modified, (and done with) log_write() is called.
+3. when finally commit() is called, all modified blocks are copied to disk. 
+
+Log consists of a header block followed by a sequence of updated block copies (*logged blocks*).
+
+A typical use of the log in a system call looks like this:
+begin_op();
+...
+bp = bread(...);
+bp->data[...] = ...;
+log_write(bp);
+...
+end_op();
+
+struct logheader {
+int n;
+int block[LOGSIZE];
+};
+
+struct log {
+struct spinlock lock;
+int start;
+int size;
+int outstanding; // how many FS sys calls are executing.
+int committing; // in commit(), please wait.
+int dev;
+struct logheader lh;
+};
+
+begin_op() :
+    After doing some checks, it will increments log.outstanding. 
+    1. If some process is commiting, sleep
+    2. If log space is exhausted, wait for someone to commit.
+    3. Else, increment log.outstanding
+
+end_op() :
+    1. Decrement log.outstanding
+    2. If someone is commiting, panic as if someone is commiting, begin_op() should sleep so not possible.(I think)
+    3. If log.outstanding is 0, then set log.commiting = 1 , else wakeup as begin_op is waiting.
+    4. if condition is true in 3, then call commit() and log.commiting = 0 and wakeup.
+
+commit() :
+    1. Write modified blocks from cache to log
+    2. Write header to disk −− the real commit
+    3. Copy committed blocks from log to their home location
+    4. Erase the transaction from the log
+
+log_write() :
+    Caller has modified b−>data and is done with the buffer. Record the block number and pin in the cache with B_DIRTY. commit() will do the disk write.
+
+### Block allocator
+
+The code is in fs.c
+The block allocator provides two functions: balloc allocates a new disk block, and bfree frees a block.
+struct superblock {
+    uint size; // Size of file system image (blocks)
+    uint nblocks; // Number of data blocks
+    uint ninodes; // Number of inodes.
+    uint nlog; // Number of log blocks
+    uint logstart; // Block number of first log block
+    uint inodestart; // Block number of first inode block
+    uint bmapstart; // Block number of first free map block
+};
+
+balloc :
+    Allocate a zeroed disk block.
+    1. loop over blocks in file system.
+    2. read the block in buffer
+    3. check if block is free using block bitmap.
+    4. if found, set bit to 1, indicating block is in use.
+    5. call log_write()
+    6. release the buffer using brelse
+    7. zero the contents in th eblock
+    8. return the block.
+
+bfree :
+    Free a disk block.
+    1. read the block in buffer using bread.
+    2. find the bit in bitmap for that corresponding block and clear it.
+    3. call log_write()
+    4. release the buffer using brelse
+
+
+
+
+
+
+

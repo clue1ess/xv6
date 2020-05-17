@@ -188,6 +188,9 @@ UPROGS=\
 	_protection2_\
 	_protection3_\
 	_test1\
+	_memtest1\
+	_memtest2\
+	_memtest3\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -260,6 +263,7 @@ EXTRA=\
 	test.c protection_level_test.c protection2.c protection3.c\
 	protection2_.c protection3_.c test1.c\
 	printf.c umalloc.c\
+	memtest1.c memtest2.c memtest3.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\	
 
