@@ -108,7 +108,7 @@ balloc_page(void)
     numallocblocks = 0;
   }
   for(i = 0; i < no; i++) {
-    cprintf("allocated %d block:", i);
+    //cprintf("allocated %d block:", i);
     begin_op();
     blocks[i] = balloc(ROOTDEV);
     /*if(blocks[i] == -1) {
@@ -122,10 +122,10 @@ balloc_page(void)
   return blocks[0];
 }
 
-/**balloc_free() frees 4KB consecutive disk space */
+/**bfree_page() frees 4KB consecutive disk space */
 
 void 
-balloc_free(uint b)
+bfree_page(uint b)
 {
   uint i;
   for(i = 0; i < 8; i++) {

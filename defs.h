@@ -56,7 +56,7 @@ int             readi(struct inode*, char*, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, char*, uint, uint);
 uint            balloc_page(void);
-void            balloc_free(uint b);
+void            bfree_page(uint b);
 
 // ide.c
 void            ideinit(void);

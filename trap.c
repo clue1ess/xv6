@@ -49,7 +49,7 @@ trap(struct trapframe *tf)
 
   switch(tf->trapno){
   case T_PGFLT:
-    cprintf("entered into trap");
+    //cprintf("entered into trap");
     addr = rcr2();
     if(addr == 0) {
       cprintf("pid %d %s: trap %d err %d on cpu %d "

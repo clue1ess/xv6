@@ -4,6 +4,7 @@ Name : Gouri Nangliya<br>
 MIS : 111703018
 
 ## Problem Statement
+
 Add this feature to xv6 memory management capabilities: cause an exception to occur when your program dereferences a null pointer, and adding the ability to change the protection levels of some pages in a process's address space.
 https://github.com/remzi-arpacidusseau/ostep-projects/tree/master/vm-xv6-intro
 
@@ -21,10 +22,8 @@ Test file :
 test.c, test1.c:
     output should be trap 14 which is page fault which dereferencing null pointer.
     
-Screenshot of output of test.c (before and after adding null ptr dereference code) :
-![Output1](screenshots/null_ptr.png)
-Screenshot of output of test1.c :
-![Output2](screenshots/null_ptr2.png)
+Screenshot of output of test.c and test1.c :
+![output1](screenshots/null_ptr_dereference.png)
 
 ## Changing PL of same pages in process's address space
 
@@ -57,7 +56,7 @@ protection3_.c
     changing global variable before mprotect which should print its value and after mprotect, fork the process and munprotect in child, change the value in child and printing its value.
 
 Screenshot of output of all above :
-![Output3](screenshots/changing_pl.png)
+![Output2](screenshots/changing_Pl.png)
 
 ## How to run
 
@@ -103,17 +102,15 @@ For implementation purpose, I referred to following github repos and I did look 
 3. https://github.com/Systems-IIITD/xv6-paging
 4. https://github.com/bhupesh17040/xv6-Memory-Management
 
-But my implementation uses bits (for representing flags in  page entry) in a different way than all of these repos. Also, implementation of algorithm for selecting a victim is different.
+But my implementation uses less no of bits (for representing flags in  page entry) and also in a different way than all of these repos. Also, implementation of algorithm for selecting a victim is different.
 
 The main intent behind this is to understand how demand paging and swapping is implemented as concept is easy to understand but challenging to implement!
 
 Outputs :
 
-!(memtest1)[screenshots/]
-!(memtest2)[screenshots/]
-!(memtest3)[screenshots/]
+![memtest1](screenshots/memtest1.png)
+![memtest2](screenshots/memtest2.png)
+![memtest3](screenshots/memtest3.png)
 
-**Incomplete**
-There are three test cases memtest1, memtest2, memtest3 which is also taken from https://github.com/RhythmIIITD/AOS-Demand-Paging.  Code works fine if first memtest2 runs and then rest. But if I run memtest2 after memtest1, test is failed and I don't know why now. But trying to figure it out.
 
 
