@@ -102,7 +102,9 @@ For implementation purpose, I referred to following github repos and I did look 
 3. https://github.com/Systems-IIITD/xv6-paging
 4. https://github.com/bhupesh17040/xv6-Memory-Management
 
-But my implementation uses less no of bits (for representing flags in  page entry) and also in a different way than all of these repos. Also, implementation of algorithm for selecting a victim is different.
+The test cases are also taken from above repos.
+
+But my implementation uses bits (for representing flags in  page entry) in a different way than all of these repos. Also, implementation of algorithm for selecting a victim is different. 
 
 The main intent behind this is to understand how demand paging and swapping is implemented as concept is easy to understand but challenging to implement!
 
